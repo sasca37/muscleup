@@ -36,7 +36,24 @@ npm install
 npm run dev
 ```
 
-기본 프론트 API 주소는 `http://localhost:8080`입니다. 변경하려면 `frontend/.env.example`을 `.env`로 복사하고 `VITE_API_BASE_URL`을 수정하세요.
+기본 프론트 API 주소는 `http://localhost:8080`입니다.
+
+프론트 환경 예시는 아래처럼 나눴습니다.
+
+```text
+frontend/.env.local.example        로컬 실행용
+frontend/.env.development.example  개발 배포용
+frontend/.env.production.example   운영 배포용
+```
+
+로컬에서는 필요하면 `frontend/.env.local.example`을 `frontend/.env.local`로 복사해서 사용하세요.
+
+```bash
+cd frontend
+npm run dev:local
+```
+
+개발 배포 URL은 `https://muscleup-psi.vercel.app`로 잡아두었습니다.
 
 ## Vercel 배포
 
@@ -55,9 +72,21 @@ Vercel에서 GitHub 저장소를 연결할 때 루트 디렉터리는 저장소 
 
 ```bash
 VITE_API_BASE_URL=https://your-backend.example.com
+VITE_APP_BASE_URL=https://muscleup-psi.vercel.app
 ```
 
 Spring 백엔드는 Vercel보다 Render, Fly.io, Railway, AWS, GCP 같은 서버 배포 환경이 더 적합합니다.
+
+백엔드도 프론트 URL을 profile로 분리했습니다.
+
+```bash
+cd backend
+./gradlew bootRun --args='--spring.profiles.active=local'
+./gradlew bootRun --args='--spring.profiles.active=dev'
+```
+
+- `local`: `http://localhost:5173`
+- `dev`: `https://muscleup-psi.vercel.app`
 
 ## 인증 설정
 

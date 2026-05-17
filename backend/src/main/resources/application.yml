@@ -1,6 +1,8 @@
 spring:
   application:
     name: health-tracker-api
+  profiles:
+    default: local
   datasource:
     url: ${DB_URL:jdbc:h2:mem:health;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE}
     username: ${DB_USERNAME:sa}

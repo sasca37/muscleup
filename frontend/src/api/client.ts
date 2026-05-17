@@ -8,6 +8,7 @@ import type {
 } from '../types/domain';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
+export const APP_BASE_URL = import.meta.env.VITE_APP_BASE_URL ?? window.location.origin;
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -50,4 +51,3 @@ export const api = {
     });
   },
 };
-
