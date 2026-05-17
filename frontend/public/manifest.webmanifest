@@ -1,0 +1,19 @@
+{
+  "name": "Muscle Log",
+  "short_name": "Muscle Log",
+  "description": "운동 기구별 세트 기록과 휴식 타이머를 관리하는 헬스 기록 웹앱",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#03152f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/muscle-log-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

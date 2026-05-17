@@ -1,0 +1,21 @@
+.DS_Store
+
+# Java
+backend/target/
+backend/build/
+backend/.gradle/
+*.class
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+
+# Env
+.env
+.env.*
+!frontend/.env.example
