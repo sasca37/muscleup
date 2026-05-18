@@ -49,6 +49,14 @@ type RoutineDay = {
   prescription: string;
 };
 
+type ActiveWorkoutRecord = {
+  id: number;
+  machineName: string;
+  muscleGroupLabel: string;
+  setsCount: number;
+  workoutDate: string;
+};
+
 const today = new Date().toISOString().slice(0, 10);
 const mockSessionKey = 'repick-mock-session';
 const legacyMockSessionKey = 'muscle-log-mock-session';
@@ -127,6 +135,28 @@ function formatSeconds(seconds: number) {
   return `${minutes}:${String(restSeconds).padStart(2, '0')}`;
 }
 
+function formatDuration(seconds: number) {
+  if (seconds < 60) {
+    return `${seconds}초`;
+  }
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+
+  if (hours > 0) {
+    return `${hours}시간 ${minutes}분`;
+  }
+
+  return `${minutes}분`;
+}
+
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function getPrescription(goal: TrainingGoal, level: TrainingLevel) {
   if (goal === 'strength') {
     return level === 'advanced' ? '5세트 x 3-5회' : '4세트 x 4-6회';
@@ -158,6 +188,9 @@ export function App() {
   const [trainingDays, setTrainingDays] = useState(4);
   const [sessionMinutes, setSessionMinutes] = useState(60);
   const [priorityGroup, setPriorityGroup] = useState<MuscleGroup>('BACK');
+  const [workoutStartedAt, setWorkoutStartedAt] = useState<number | null>(null);
+  const [workoutElapsedSeconds, setWorkoutElapsedSeconds] = useState(0);
+  const [activeWorkoutRecords, setActiveWorkoutRecords] = useState<ActiveWorkoutRecord[]>([]);
   const [restDurationSeconds, setRestDurationSeconds] = useState(() => {
     const storedValue = Number(window.localStorage.getItem(restDurationKey));
     return storedValue >= minRestSeconds && storedValue <= maxRestSeconds
@@ -221,6 +254,20 @@ export function App() {
 
     return () => window.clearInterval(intervalId);
   }, [sets]);
+
+  useEffect(() => {
+    if (workoutStartedAt == null) {
+      return;
+    }
+
+    const tick = () => {
+      setWorkoutElapsedSeconds(Math.floor((Date.now() - workoutStartedAt) / 1000));
+    };
+
+    tick();
+    const intervalId = window.setInterval(tick, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [workoutStartedAt]);
 
   const selectedMachine = useMemo(
     () => machines.find((machine) => machine.id === selectedMachineId) ?? null,
@@ -300,6 +347,40 @@ export function App() {
     });
   }, [priorityGroup, splitType, trainingDays, trainingGoal, trainingLevel]);
   const weeklyExerciseCount = weeklyPlan.reduce((total, day) => total + day.exercises.length, 0);
+  const activeWorkoutParts = Array.from(new Set(activeWorkoutRecords.map((record) => record.muscleGroupLabel)));
+  const activeWorkoutSetCount = activeWorkoutRecords.reduce((total, record) => total + record.setsCount, 0);
+  const trainedDateSet = new Set(sessions.map((session) => session.workoutDate));
+  const todaysSessions = sessions.filter((session) => session.workoutDate === today);
+  const todaysExerciseNames = Array.from(
+    new Set(todaysSessions.flatMap((session) => session.records.map((record) => record.machineName))),
+  );
+  const todaysParts = Array.from(
+    new Set(todaysSessions.flatMap((session) => session.records.map((record) => record.muscleGroupLabel))),
+  );
+  const calendarBaseDate = new Date();
+  const calendarYear = calendarBaseDate.getFullYear();
+  const calendarMonth = calendarBaseDate.getMonth();
+  const calendarMonthLabel = `${calendarYear}년 ${calendarMonth + 1}월`;
+  const calendarStartOffset = new Date(calendarYear, calendarMonth, 1).getDay();
+  const calendarMonthLength = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+  const calendarTrainedDateSet = new Set(
+    sessions
+      .filter((session) => {
+        const sessionDate = new Date(`${session.workoutDate}T00:00:00`);
+        return sessionDate.getFullYear() === calendarYear && sessionDate.getMonth() === calendarMonth;
+      })
+      .map((session) => session.workoutDate),
+  );
+  const calendarCells: Array<{ day: number; dateKey: string } | null> = [
+    ...Array.from({ length: calendarStartOffset }, () => null),
+    ...Array.from({ length: calendarMonthLength }, (_, index) => {
+      const day = index + 1;
+      return {
+        day,
+        dateKey: formatDateKey(new Date(calendarYear, calendarMonth, day)),
+      };
+    }),
+  ];
 
   if (!authChecked) {
     return <main className="loading">로그인 상태 확인 중</main>;
@@ -355,6 +436,18 @@ export function App() {
     setSets([createDraftSet(), createDraftSet(), createDraftSet()]);
   }
 
+  function startWorkout() {
+    setWorkoutStartedAt(Date.now());
+    setWorkoutElapsedSeconds(0);
+    setActiveWorkoutRecords([]);
+    setWorkoutDate(today);
+    setActiveView('record');
+  }
+
+  function finishWorkout() {
+    setWorkoutStartedAt(null);
+  }
+
   async function submitWorkout(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedMachineId) {
@@ -380,6 +473,7 @@ export function App() {
       id: Date.now(),
       workoutDate,
       memo,
+      durationSeconds: workoutStartedAt == null ? undefined : Math.max(1, workoutElapsedSeconds),
       records: [
         {
           id: Date.now() + 1,
@@ -398,6 +492,18 @@ export function App() {
 
     window.setTimeout(() => {
       setSessions((current) => [created, ...current]);
+      if (workoutStartedAt != null) {
+        setActiveWorkoutRecords((current) => [
+          {
+            id: created.records[0].id,
+            machineName: created.records[0].machineName,
+            muscleGroupLabel: created.records[0].muscleGroupLabel,
+            setsCount: created.records[0].sets.length,
+            workoutDate: created.workoutDate,
+          },
+          ...current,
+        ]);
+      }
       resetDraft();
       setSaving(false);
     }, 250);
@@ -438,14 +544,14 @@ export function App() {
       <section className="hero-band" id="home">
         <div className="hero-glow" />
         <div className="hero-content">
-          <span>오늘의 운동 기록</span>
+          <span>{workoutStartedAt == null ? '오늘의 운동 기록' : `운동 중 ${formatSeconds(workoutElapsedSeconds)}`}</span>
           <h1>
             방금 한 세트까지
             <br />
             기구별로 남겨볼까요?
           </h1>
-          <button type="button" onClick={() => setActiveView('record')}>
-            기록 시작하기
+          <button type="button" onClick={workoutStartedAt == null ? startWorkout : () => setActiveView('record')}>
+            {workoutStartedAt == null ? '운동 시작' : '운동 이어가기'}
           </button>
         </div>
       </section>
@@ -458,22 +564,61 @@ export function App() {
                 <h2>오늘의 Repick</h2>
                 <p>기록, 휴식 타이머, 이전 수행 기록을 한 흐름으로 관리합니다.</p>
               </div>
-              <button className="link-button" type="button" onClick={() => setActiveView('record')}>
-                운동 기록하기
+              <button className="link-button" type="button" onClick={workoutStartedAt == null ? startWorkout : () => setActiveView('record')}>
+                {workoutStartedAt == null ? '운동 시작하기' : '운동 이어가기'}
                 <ChevronRight size={16} />
               </button>
             </div>
 
+            <section className={workoutStartedAt == null ? 'workout-status-card' : 'workout-status-card active'}>
+              <div className="workout-status-main">
+                <span>{workoutStartedAt == null ? 'Ready' : 'Live workout'}</span>
+                <strong>{workoutStartedAt == null ? '오늘 운동을 시작해볼까요?' : formatSeconds(workoutElapsedSeconds)}</strong>
+                <p>
+                  {workoutStartedAt == null
+                    ? '시작 버튼을 누르면 운동 시간이 기록되고, 저장한 종목과 부위가 세션 요약에 쌓입니다.'
+                    : `${activeWorkoutRecords.length}개 운동, ${activeWorkoutSetCount}세트 진행 중`}
+                </p>
+              </div>
+              <div className="workout-status-actions">
+                {workoutStartedAt == null ? (
+                  <button className="primary-button" type="button" onClick={startWorkout}>
+                    <Timer size={16} />
+                    운동 시작
+                  </button>
+                ) : (
+                  <>
+                    <button className="secondary-button" type="button" onClick={() => setActiveView('record')}>
+                      <Plus size={16} />
+                      기록 추가
+                    </button>
+                    <button className="primary-button" type="button" onClick={finishWorkout}>
+                      <CheckCircle2 size={16} />
+                      운동 종료
+                    </button>
+                  </>
+                )}
+              </div>
+              <div className="workout-chip-row">
+                {(workoutStartedAt == null ? todaysParts : activeWorkoutParts).length === 0 && (
+                  <span>아직 기록된 부위가 없습니다</span>
+                )}
+                {(workoutStartedAt == null ? todaysParts : activeWorkoutParts).map((part) => (
+                  <span key={part}>{part}</span>
+                ))}
+              </div>
+            </section>
+
             <div className="home-metrics">
               <article>
                 <Dumbbell size={22} />
-                <strong>{mockMachines.length}</strong>
-                <span>등록된 기구</span>
+                <strong>{todaysExerciseNames.length}</strong>
+                <span>오늘 운동 종목</span>
               </article>
               <article>
                 <CalendarDays size={22} />
-                <strong>{sessions.length}</strong>
-                <span>저장한 세션</span>
+                <strong>{trainedDateSet.size}</strong>
+                <span>운동한 날짜</span>
               </article>
               <article>
                 <CheckCircle2 size={22} />
@@ -659,6 +804,23 @@ export function App() {
             <ChevronRight size={16} />
           </button>
         </div>
+
+        {workoutStartedAt != null && (
+          <section className="active-workout-strip">
+            <div>
+              <span>진행 중인 운동</span>
+              <strong>{formatSeconds(workoutElapsedSeconds)}</strong>
+            </div>
+            <p>
+              {activeWorkoutRecords.length === 0
+                ? '첫 종목을 저장하면 운동 요약에 추가됩니다.'
+                : `${activeWorkoutRecords.map((record) => record.machineName).join(', ')} 기록됨`}
+            </p>
+            <button className="secondary-button" type="button" onClick={finishWorkout}>
+              운동 종료
+            </button>
+          </section>
+        )}
 
         <div className="segment-control">
           {muscleGroups.map((group) => (
@@ -975,6 +1137,52 @@ export function App() {
               <ChevronRight size={16} />
             </button>
           </div>
+
+          <section className="activity-overview-grid">
+            <article className="activity-summary-card">
+              <span>이번 달 운동일</span>
+              <strong>{calendarTrainedDateSet.size}일</strong>
+              <p>
+                {todaysExerciseNames.length > 0
+                  ? `오늘은 ${todaysExerciseNames.join(', ')}를 기록했습니다.`
+                  : '오늘 운동을 시작하면 캘린더에 바로 표시됩니다.'}
+              </p>
+            </article>
+
+            <article className="calendar-card">
+              <div className="calendar-card-head">
+                <strong>{calendarMonthLabel}</strong>
+                <span>운동한 날 표시</span>
+              </div>
+              <div className="calendar-weekdays">
+                {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
+                  <span key={day}>{day}</span>
+                ))}
+              </div>
+              <div className="calendar-grid">
+                {calendarCells.map((cell, index) => (
+                  <div
+                    className={
+                      cell == null
+                        ? 'calendar-day empty-day'
+                        : calendarTrainedDateSet.has(cell.dateKey)
+                          ? 'calendar-day trained'
+                          : 'calendar-day'
+                    }
+                    key={cell?.dateKey ?? `blank-${index}`}
+                  >
+                    {cell && (
+                      <>
+                        <span>{cell.day}</span>
+                        {calendarTrainedDateSet.has(cell.dateKey) && <small />}
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </article>
+          </section>
+
           <div className="session-gallery">
             {sessions.length === 0 && (
               <article className="session-tile empty-tile">
@@ -988,6 +1196,10 @@ export function App() {
                 <div className="tile-overlay">
                   <span>{session.workoutDate}</span>
                   <strong>{session.records.map((record) => record.machineName).join(', ')}</strong>
+                  <small>
+                    {session.durationSeconds ? formatDuration(session.durationSeconds) : '기록 세션'} ·{' '}
+                    {session.records.map((record) => record.muscleGroupLabel).join(', ')}
+                  </small>
                 </div>
               </article>
             ))}

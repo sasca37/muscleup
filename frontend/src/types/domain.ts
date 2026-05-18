@@ -35,6 +35,7 @@ export type WorkoutSession = {
   id: number;
   workoutDate: string;
   memo: string | null;
+  durationSeconds?: number;
   records: {
     id: number;
     machineId: number;
@@ -57,4 +58,3 @@ export type CreateWorkoutPayload = {
     }[];
   }[];
 };
-
