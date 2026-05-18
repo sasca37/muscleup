@@ -1,4 +1,4 @@
-# Muscle Log
+# Repick
 
 Spring Boot + React 기반 헬스 기록 MVP입니다.
 
@@ -41,12 +41,12 @@ npm run dev
 프론트 환경 예시는 아래처럼 나눴습니다.
 
 ```text
-frontend/.env.local.example        로컬 실행용
-frontend/.env.development.example  개발 배포용
+frontend/.env.localdev.example     로컬 실행용
+frontend/.env.devdeploy.example    개발 배포용
 frontend/.env.production.example   운영 배포용
 ```
 
-로컬에서는 필요하면 `frontend/.env.local.example`을 `frontend/.env.local`로 복사해서 사용하세요.
+로컬에서는 필요하면 `frontend/.env.localdev.example`을 `frontend/.env.localdev`로 복사해서 사용하세요.
 
 ```bash
 cd frontend
@@ -54,6 +54,8 @@ npm run dev:local
 ```
 
 개발 배포 URL은 `https://muscleup-psi.vercel.app`로 잡아두었습니다.
+
+Vite에서 `local`은 `.env.local` postfix와 충돌하는 예약 이름이라 mode 이름은 `localdev`를 사용합니다.
 
 ## Vercel 배포
 

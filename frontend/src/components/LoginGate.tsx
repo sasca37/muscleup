@@ -1,18 +1,30 @@
 import { Activity, Dumbbell, LogIn, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
-import { api } from '../api/client';
+import type { User } from '../types/domain';
 
-export function LoginGate() {
+type LoginGateProps = {
+  onLoginSuccess: (user: User) => void;
+};
+
+export function LoginGate({ onLoginSuccess }: LoginGateProps) {
   const [loginOpen, setLoginOpen] = useState(false);
 
-  function markLoginRequested() {
-    window.localStorage.setItem('muscle-log-login-requested', 'true');
+  function completeMockLogin(provider: 'google' | 'kakao') {
+    onLoginSuccess({
+      id: 1,
+      email: 'demo@repick.app',
+      displayName: provider === 'google' ? 'Google Demo' : 'Kakao Demo',
+      provider,
+    });
+    setLoginOpen(false);
   }
 
   return (
     <main className="login-shell">
       <header className="public-topbar">
-        <div className="brand-wordmark">MUSCLE LOG</div>
+        <button className="brand-wordmark brand-home-button" type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+          Repick
+        </button>
         <nav className="public-nav" aria-label="소개 메뉴">
           <a href="#features">기능</a>
           <a href="#preview">미리보기</a>
@@ -39,7 +51,7 @@ export function LoginGate() {
             다음 운동의 기준이 되게.
           </h1>
           <p>
-            Muscle Log는 운동 기구별 무게, 횟수, 이전 기록을 빠르게 확인하는 헬스 기록 서비스입니다.
+            Repick은 운동 기구별 무게, 횟수, 이전 기록을 빠르게 확인하는 헬스 기록 서비스입니다.
           </p>
           <div className="public-actions">
             <button className="primary-button" type="button" onClick={() => setLoginOpen(true)}>
@@ -52,18 +64,31 @@ export function LoginGate() {
           </div>
 
           {loginOpen && (
-            <section className="login-panel" aria-label="로그인 선택">
-              <strong className="login-wordmark">MUSCLE LOG</strong>
-              <p>소셜 계정으로 시작하면 기구별 운동 기록을 저장할 수 있습니다.</p>
-              <div className="login-actions">
-                <a className="login-button google" href={api.loginUrl('google')} onClick={markLoginRequested}>
-                  Google로 시작
-                </a>
-                <a className="login-button kakao" href={api.loginUrl('kakao')} onClick={markLoginRequested}>
-                  Kakao로 시작
-                </a>
-              </div>
-            </section>
+            <div className="login-modal-backdrop" role="presentation" onClick={() => setLoginOpen(false)}>
+              <section
+                aria-label="로그인 선택"
+                aria-modal="true"
+                className="login-modal"
+                role="dialog"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <button className="modal-close-button" type="button" onClick={() => setLoginOpen(false)}>
+                  닫기
+                </button>
+                <strong className="login-wordmark">Repick</strong>
+                <h2>소셜 계정으로 시작하기</h2>
+                <p>지금은 프론트 화면 확인용이라 버튼을 누르면 바로 로그인 성공 상태로 이동합니다.</p>
+                <div className="login-actions">
+                  <button className="login-button google" type="button" onClick={() => completeMockLogin('google')}>
+                    Google로 시작
+                  </button>
+                  <button className="login-button kakao" type="button" onClick={() => completeMockLogin('kakao')}>
+                    Kakao로 시작
+                  </button>
+                </div>
+                <span className="mock-login-note">백엔드 OAuth 연결 전까지 사용하는 목업 로그인입니다.</span>
+              </section>
+            </div>
           )}
         </div>
 

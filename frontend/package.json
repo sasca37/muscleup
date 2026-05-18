@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --mode local",
-    "dev:local": "vite --mode local",
-    "dev:development": "vite --mode development",
+    "dev": "vite --mode localdev",
+    "dev:local": "vite --mode localdev",
+    "dev:development": "vite --mode devdeploy",
     "build": "tsc -b && vite build",
-    "build:development": "tsc -b && vite build --mode development",
+    "build:development": "tsc -b && vite build --mode devdeploy",
     "preview": "vite preview"
   },
   "dependencies": {

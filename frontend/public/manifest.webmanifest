@@ -1,6 +1,6 @@
 {
-  "name": "Muscle Log",
-  "short_name": "Muscle Log",
+  "name": "Repick",
+  "short_name": "Repick",
   "description": "운동 기구별 세트 기록과 휴식 타이머를 관리하는 헬스 기록 웹앱",
   "start_url": "/",
   "display": "standalone",
@@ -9,11 +9,10 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/muscle-log-icon.svg",
+      "src": "/repick-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]
 }
-
