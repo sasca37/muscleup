@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Dumbbell,
   History,
+  LogOut,
   Minus,
   Plus,
   RotateCcw,
@@ -448,6 +449,17 @@ export function App() {
     setWorkoutStartedAt(null);
   }
 
+  function logout() {
+    window.localStorage.removeItem(mockSessionKey);
+    window.localStorage.removeItem(legacyMockSessionKey);
+    setWorkoutStartedAt(null);
+    setWorkoutElapsedSeconds(0);
+    setActiveWorkoutRecords([]);
+    setSessions([]);
+    setUser(null);
+    setActiveView('home');
+  }
+
   async function submitWorkout(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedMachineId) {
@@ -538,6 +550,9 @@ export function App() {
         <div className="user-chip">
           <UserRound size={18} />
           <span>{user.displayName}</span>
+          <button aria-label="로그아웃" type="button" onClick={logout}>
+            <LogOut size={16} />
+          </button>
         </div>
       </header>
 

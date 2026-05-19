@@ -1,5 +1,6 @@
 import { Activity, Dumbbell, LogIn, TrendingUp } from 'lucide-react';
-import { useState } from 'react';
+import { FormEvent, useState } from 'react';
+import { api } from '../api/client';
 import type { User } from '../types/domain';
 
 type LoginGateProps = {
@@ -8,15 +9,24 @@ type LoginGateProps = {
 
 export function LoginGate({ onLoginSuccess }: LoginGateProps) {
   const [loginOpen, setLoginOpen] = useState(false);
+  const [loginId, setLoginId] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loggingIn, setLoggingIn] = useState(false);
 
-  function completeMockLogin(provider: 'google' | 'kakao') {
-    onLoginSuccess({
-      id: 1,
-      email: 'demo@repick.app',
-      displayName: provider === 'google' ? 'Google Demo' : 'Kakao Demo',
-      provider,
-    });
-    setLoginOpen(false);
+  async function submitLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoggingIn(true);
+    setLoginError(null);
+
+    try {
+      const user = await api.login(loginId);
+      onLoginSuccess(user);
+      setLoginOpen(false);
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : '로그인에 실패했습니다.');
+    } finally {
+      setLoggingIn(false);
+    }
   }
 
   return (
@@ -76,17 +86,28 @@ export function LoginGate({ onLoginSuccess }: LoginGateProps) {
                   닫기
                 </button>
                 <strong className="login-wordmark">Repick</strong>
-                <h2>소셜 계정으로 시작하기</h2>
-                <p>지금은 프론트 화면 확인용이라 버튼을 누르면 바로 로그인 성공 상태로 이동합니다.</p>
-                <div className="login-actions">
-                  <button className="login-button google" type="button" onClick={() => completeMockLogin('google')}>
-                    Google로 시작
+                <h2>ID로 시작하기</h2>
+                <p>입력한 ID가 있으면 바로 로그인하고, 없으면 새 유저로 자동 가입됩니다.</p>
+                <form className="login-id-form" onSubmit={submitLogin}>
+                  <label>
+                    <span>로그인 ID</span>
+                    <input
+                      autoFocus
+                      inputMode="text"
+                      maxLength={30}
+                      minLength={3}
+                      pattern="[A-Za-z0-9._-]{3,30}"
+                      placeholder="예: sasca37"
+                      value={loginId}
+                      onChange={(event) => setLoginId(event.target.value)}
+                    />
+                  </label>
+                  {loginError && <p className="error-message">{loginError}</p>}
+                  <button className="login-button primary-login" type="submit" disabled={loggingIn}>
+                    {loggingIn ? '확인 중' : '로그인 / 가입'}
                   </button>
-                  <button className="login-button kakao" type="button" onClick={() => completeMockLogin('kakao')}>
-                    Kakao로 시작
-                  </button>
-                </div>
-                <span className="mock-login-note">백엔드 OAuth 연결 전까지 사용하는 목업 로그인입니다.</span>
+                </form>
+                <span className="mock-login-note">영문, 숫자, '.', '_', '-' 조합 3~30자를 사용할 수 있습니다.</span>
               </section>
             </div>
           )}

@@ -337,6 +337,11 @@ button {
   gap: 10px;
 }
 
+.login-id-form {
+  display: grid;
+  gap: 12px;
+}
+
 .login-button {
   display: block;
   border: 0;
@@ -357,6 +362,16 @@ button {
 .login-button.kakao {
   color: #191600;
   background: #fee500;
+}
+
+.primary-login {
+  background: #0a66d8;
+  color: #ffffff;
+}
+
+.primary-login:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .mock-login-note {
@@ -448,6 +463,23 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.user-chip button {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #d9e0ea;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #536274;
+  padding: 0;
+}
+
+.user-chip button:hover {
+  border-color: #0a66d8;
+  color: #0a66d8;
 }
 
 .hero-band {

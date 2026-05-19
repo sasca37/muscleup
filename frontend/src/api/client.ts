@@ -1,18 +1,16 @@
-import type {
-  CreateWorkoutPayload,
-  ExerciseMachine,
-  MachineHistory,
-  MuscleGroup,
-  User,
-  WorkoutSession,
-} from '../types/domain';
+import type { User } from '../types/domain';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 export const APP_BASE_URL = import.meta.env.VITE_APP_BASE_URL ?? window.location.origin;
 
+type ApiErrorResponse = {
+  code: string;
+  message: string;
+  timestamp: string;
+};
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...options?.headers,
@@ -21,33 +19,24 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    let message = `API request failed: ${response.status}`;
+    try {
+      const error = (await response.json()) as ApiErrorResponse;
+      message = error.message || message;
+    } catch {
+      // Use the fallback message when the backend returns no JSON body.
+    }
+    throw new Error(message);
   }
 
   return response.json() as Promise<T>;
 }
 
 export const api = {
-  loginUrl(provider: 'google' | 'kakao') {
-    return `${API_BASE_URL}/oauth2/authorization/${provider}`;
-  },
-  me() {
-    return request<User>('/api/me');
-  },
-  machines(muscleGroup?: MuscleGroup) {
-    const query = muscleGroup ? `?muscleGroup=${muscleGroup}` : '';
-    return request<ExerciseMachine[]>(`/api/machines${query}`);
-  },
-  machineHistory(machineId: number) {
-    return request<MachineHistory[]>(`/api/machines/${machineId}/history`);
-  },
-  workouts() {
-    return request<WorkoutSession[]>('/api/workouts');
-  },
-  createWorkout(payload: CreateWorkoutPayload) {
-    return request<WorkoutSession>('/api/workouts', {
+  login(loginId: string) {
+    return request<User>('/api/users/login', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ loginId }),
     });
   },
 };

@@ -1,10 +1,12 @@
 export type MuscleGroup = 'CHEST' | 'BACK' | 'LEGS' | 'SHOULDERS' | 'ARMS' | 'CORE';
 
 export type User = {
-  id: number;
-  email: string | null;
+  id: string;
+  loginId: string;
   displayName: string;
-  provider: string;
+  created: boolean;
+  createdAt: string;
+  lastLoginAt: string;
 };
 
 export type ExerciseMachine = {
