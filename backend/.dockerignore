@@ -1,0 +1,10 @@
+.gradle
+build
+target
+out
+
+*.log
+.DS_Store
+
+.env
+.env.*
