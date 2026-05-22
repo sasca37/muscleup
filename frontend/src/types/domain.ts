@@ -1,12 +1,41 @@
 export type MuscleGroup = 'CHEST' | 'BACK' | 'LEGS' | 'SHOULDERS' | 'ARMS' | 'CORE';
+export type WorkoutGoal = 'DIET' | 'MUSCLE_GAIN' | 'HEALTH';
+export type Gender = 'MALE' | 'FEMALE';
+export type AgeGroup =
+  | 'AGE_10S'
+  | 'AGE_20S'
+  | 'AGE_30S'
+  | 'AGE_40S'
+  | 'AGE_50S'
+  | 'AGE_60S'
+  | 'AGE_70S'
+  | 'AGE_80S'
+  | 'AGE_90S';
 
 export type User = {
   id: string;
+  email: string;
   loginId: string;
+  nickname: string;
   displayName: string;
+  workoutGoal: WorkoutGoal;
+  gender: Gender;
+  ageGroup: AgeGroup;
   created: boolean;
   createdAt: string;
   lastLoginAt: string;
+};
+
+export type LoginPayload = {
+  email: string;
+  password: string;
+};
+
+export type RegisterPayload = LoginPayload & {
+  nickname: string;
+  workoutGoal: WorkoutGoal;
+  gender: Gender;
+  ageGroup: AgeGroup;
 };
 
 export type ExerciseMachine = {
@@ -20,13 +49,14 @@ export type ExerciseMachine = {
 
 export type WorkoutSet = {
   setOrder: number;
-  weightKg: string;
+  weightKg: string | number;
   reps: number;
+  completed?: boolean;
 };
 
 export type MachineHistory = {
-  sessionId: number;
-  recordId: number;
+  sessionId: string;
+  recordId: string;
   workoutDate: string;
   machineName: string;
   sets: WorkoutSet[];
@@ -34,29 +64,42 @@ export type MachineHistory = {
 };
 
 export type WorkoutSession = {
-  id: number;
+  id: string;
+  userId?: string;
   workoutDate: string;
+  status?: 'IN_PROGRESS' | 'FINISHED';
+  startedAt?: string;
+  finishedAt?: string | null;
   memo: string | null;
   durationSeconds?: number;
   records: {
-    id: number;
+    id: string;
+    recordId?: string;
     machineId: number;
     machineName: string;
+    catalogId?: number;
+    exerciseName?: string;
+    muscleGroup?: MuscleGroup;
     muscleGroupLabel: string;
+    movementPattern?: string;
     note: string | null;
     sets: WorkoutSet[];
+    createdAt?: string;
   }[];
 };
 
-export type CreateWorkoutPayload = {
-  workoutDate: string;
-  memo: string;
-  records: {
-    machineId: number;
-    note: string;
-    sets: {
-      weightKg: number;
-      reps: number;
-    }[];
+export type StartWorkoutSessionPayload = {
+  workoutDate?: string;
+  memo?: string;
+};
+
+export type AddWorkoutRecordPayload = {
+  catalogId: number;
+  note?: string;
+  sets: {
+    setOrder?: number;
+    weightKg: number;
+    reps: number;
+    completed?: boolean;
   }[];
 };

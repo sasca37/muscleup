@@ -15,7 +15,18 @@ public class UserAccount {
     @Indexed(unique = true)
     private String loginId;
 
-    private String displayName;
+    @Indexed(unique = true, sparse = true)
+    private String email;
+
+    private String passwordHash;
+
+    private String nickname;
+
+    private WorkoutGoal workoutGoal;
+
+    private Gender gender;
+
+    private AgeGroup ageGroup;
 
     private Instant createdAt;
 
@@ -24,16 +35,36 @@ public class UserAccount {
     protected UserAccount() {
     }
 
-    private UserAccount(String loginId, String displayName, Instant now) {
-        this.loginId = loginId;
-        this.displayName = displayName;
+    private UserAccount(
+        String email,
+        String passwordHash,
+        String nickname,
+        WorkoutGoal workoutGoal,
+        Gender gender,
+        AgeGroup ageGroup,
+        Instant now
+    ) {
+        this.loginId = email;
+        this.email = email;
+        this.passwordHash = passwordHash;
+        this.nickname = nickname;
+        this.workoutGoal = workoutGoal;
+        this.gender = gender;
+        this.ageGroup = ageGroup;
         this.createdAt = now;
         this.lastLoginAt = now;
     }
 
-    public static UserAccount create(String loginId) {
+    public static UserAccount register(
+        String email,
+        String passwordHash,
+        String nickname,
+        WorkoutGoal workoutGoal,
+        Gender gender,
+        AgeGroup ageGroup
+    ) {
         Instant now = Instant.now();
-        return new UserAccount(loginId, loginId, now);
+        return new UserAccount(email, passwordHash, nickname, workoutGoal, gender, ageGroup, now);
     }
 
     public void markLoggedIn() {
@@ -48,8 +79,32 @@ public class UserAccount {
         return loginId;
     }
 
+    public String getEmail() {
+        return email;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public String getNickname() {
+        return nickname;
+    }
+
     public String getDisplayName() {
-        return displayName;
+        return nickname;
+    }
+
+    public WorkoutGoal getWorkoutGoal() {
+        return workoutGoal;
+    }
+
+    public Gender getGender() {
+        return gender;
+    }
+
+    public AgeGroup getAgeGroup() {
+        return ageGroup;
     }
 
     public Instant getCreatedAt() {

@@ -17,10 +17,12 @@ import {
   UserRound,
 } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { api } from './api/client';
 import { LoginGate } from './components/LoginGate';
 import { muscleGroups } from './data/muscleGroups';
 import { mockMachines } from './data/mockMachines';
 import type {
+  ExerciseMachine,
   MachineHistory,
   MuscleGroup,
   User,
@@ -51,7 +53,7 @@ type RoutineDay = {
 };
 
 type ActiveWorkoutRecord = {
-  id: number;
+  id: string;
   machineName: string;
   muscleGroupLabel: string;
   setsCount: number;
@@ -174,6 +176,7 @@ export function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [activeView, setActiveView] = useState<ActiveView>('home');
+  const [exerciseMachines, setExerciseMachines] = useState<ExerciseMachine[]>(mockMachines);
   const [selectedGroup, setSelectedGroup] = useState<MuscleGroup>('CHEST');
   const [selectedMachineId, setSelectedMachineId] = useState<number | null>(null);
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
@@ -191,7 +194,10 @@ export function App() {
   const [priorityGroup, setPriorityGroup] = useState<MuscleGroup>('BACK');
   const [workoutStartedAt, setWorkoutStartedAt] = useState<number | null>(null);
   const [workoutElapsedSeconds, setWorkoutElapsedSeconds] = useState(0);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeWorkoutRecords, setActiveWorkoutRecords] = useState<ActiveWorkoutRecord[]>([]);
+  const [exercisePickerOpen, setExercisePickerOpen] = useState(false);
+  const [exerciseFormOpen, setExerciseFormOpen] = useState(false);
   const [restDurationSeconds, setRestDurationSeconds] = useState(() => {
     const storedValue = Number(window.localStorage.getItem(restDurationKey));
     return storedValue >= minRestSeconds && storedValue <= maxRestSeconds
@@ -223,9 +229,69 @@ export function App() {
     setAuthChecked(true);
   }, []);
 
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    let ignore = false;
+
+    api.listExercises()
+      .then((exercises) => {
+        if (!ignore && exercises.length > 0) {
+          setExerciseMachines(exercises);
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
+          setExerciseMachines(mockMachines);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    let ignore = false;
+
+    api.listWorkoutSessions(user.id)
+      .then((loadedSessions) => {
+        if (ignore) {
+          return;
+        }
+
+        setSessions(loadedSessions);
+        const inProgressSession = loadedSessions.find(
+          (session) => session.status === 'IN_PROGRESS' && session.workoutDate === today,
+        );
+
+        if (inProgressSession) {
+          setActiveSessionId(inProgressSession.id);
+          setWorkoutStartedAt(inProgressSession.startedAt ? new Date(inProgressSession.startedAt).getTime() : Date.now());
+          setWorkoutDate(inProgressSession.workoutDate);
+          setActiveWorkoutRecords(toActiveWorkoutRecords(inProgressSession));
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
+          setSessions([]);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [user]);
+
   const machines = useMemo(
-    () => mockMachines.filter((machine) => machine.muscleGroup === selectedGroup),
-    [selectedGroup],
+    () => exerciseMachines.filter((machine) => machine.muscleGroup === selectedGroup),
+    [exerciseMachines, selectedGroup],
   );
 
   useEffect(() => {
@@ -233,7 +299,7 @@ export function App() {
       if (current != null && machines.some((machine) => machine.id === current)) {
         return current;
       }
-      return machines[0]?.id ?? null;
+      return null;
       });
   }, [machines]);
 
@@ -330,7 +396,7 @@ export function App() {
         ? [priorityGroup, ...baseDay.groups].slice(0, 4)
         : baseDay.groups;
       const catalog = dayGroups.flatMap((group) =>
-        mockMachines.filter((machine) => machine.muscleGroup === group).slice(0, trainingLevel === 'advanced' ? 2 : 1),
+        exerciseMachines.filter((machine) => machine.muscleGroup === group).slice(0, trainingLevel === 'advanced' ? 2 : 1),
       );
       const maxExercises = trainingLevel === 'beginner' ? 4 : trainingLevel === 'advanced' ? 6 : 5;
 
@@ -346,12 +412,24 @@ export function App() {
         prescription,
       };
     });
-  }, [priorityGroup, splitType, trainingDays, trainingGoal, trainingLevel]);
+  }, [exerciseMachines, priorityGroup, splitType, trainingDays, trainingGoal, trainingLevel]);
   const weeklyExerciseCount = weeklyPlan.reduce((total, day) => total + day.exercises.length, 0);
   const activeWorkoutParts = Array.from(new Set(activeWorkoutRecords.map((record) => record.muscleGroupLabel)));
   const activeWorkoutSetCount = activeWorkoutRecords.reduce((total, record) => total + record.setsCount, 0);
   const trainedDateSet = new Set(sessions.map((session) => session.workoutDate));
   const todaysSessions = sessions.filter((session) => session.workoutDate === today);
+  const todaysWorkoutRecords: ActiveWorkoutRecord[] = todaysSessions.flatMap((session) =>
+    session.records.map((record) => ({
+      id: record.id,
+      machineName: record.machineName,
+      muscleGroupLabel: record.muscleGroupLabel,
+      setsCount: record.sets.length,
+      workoutDate: session.workoutDate,
+    })),
+  );
+  const visibleWorkoutRecords = workoutStartedAt == null ? todaysWorkoutRecords : activeWorkoutRecords;
+  const visibleWorkoutParts = Array.from(new Set(visibleWorkoutRecords.map((record) => record.muscleGroupLabel)));
+  const visibleWorkoutSetCount = visibleWorkoutRecords.reduce((total, record) => total + record.setsCount, 0);
   const todaysExerciseNames = Array.from(
     new Set(todaysSessions.flatMap((session) => session.records.map((record) => record.machineName))),
   );
@@ -382,6 +460,8 @@ export function App() {
       };
     }),
   ];
+  const workoutDateValue = new Date(`${workoutDate}T00:00:00`);
+  const workoutDateLabel = `${workoutDateValue.getMonth() + 1}월 ${workoutDateValue.getDate()}일, 오후 운동`;
 
   if (!authChecked) {
     return <main className="loading">로그인 상태 확인 중</main>;
@@ -437,16 +517,122 @@ export function App() {
     setSets([createDraftSet(), createDraftSet(), createDraftSet()]);
   }
 
-  function startWorkout() {
-    setWorkoutStartedAt(Date.now());
+  function toActiveWorkoutRecords(session: WorkoutSession): ActiveWorkoutRecord[] {
+    return session.records.map((record) => ({
+      id: record.id,
+      machineName: record.machineName,
+      muscleGroupLabel: record.muscleGroupLabel,
+      setsCount: record.sets.length,
+      workoutDate: session.workoutDate,
+    }));
+  }
+
+  function upsertSession(nextSession: WorkoutSession) {
+    setSessions((current) => {
+      const exists = current.some((session) => session.id === nextSession.id);
+      if (exists) {
+        return current.map((session) => (session.id === nextSession.id ? nextSession : session));
+      }
+
+      return [nextSession, ...current];
+    });
+  }
+
+  function createLocalWorkoutSession(): WorkoutSession {
+    const now = new Date().toISOString();
+    return {
+      id: `local-${Date.now()}`,
+      userId: user?.id,
+      workoutDate: today,
+      status: 'IN_PROGRESS',
+      startedAt: now,
+      memo: null,
+      records: [],
+    };
+  }
+
+  function isLocalSession(sessionId: string) {
+    return sessionId.startsWith('local-');
+  }
+
+  async function ensureWorkoutSessionStarted() {
+    if (activeSessionId && !isLocalSession(activeSessionId)) {
+      return activeSessionId;
+    }
+
+    if (user) {
+      try {
+        const startedSession = await api.startWorkoutSession(user.id, { workoutDate: today, memo });
+        setSessions((current) => [
+          startedSession,
+          ...current.filter((session) => session.id !== startedSession.id && session.id !== activeSessionId),
+        ]);
+        setActiveSessionId(startedSession.id);
+        setWorkoutStartedAt(startedSession.startedAt ? new Date(startedSession.startedAt).getTime() : Date.now());
+        setWorkoutElapsedSeconds(0);
+        setActiveWorkoutRecords(toActiveWorkoutRecords(startedSession));
+        setWorkoutDate(startedSession.workoutDate);
+        return startedSession.id;
+      } catch {
+        // Keep the workout usable when the backend is not running locally.
+      }
+    }
+
+    const localSession = createLocalWorkoutSession();
+    upsertSession(localSession);
+    setActiveSessionId(localSession.id);
+    setWorkoutStartedAt(localSession.startedAt ? new Date(localSession.startedAt).getTime() : Date.now());
     setWorkoutElapsedSeconds(0);
     setActiveWorkoutRecords([]);
     setWorkoutDate(today);
+    return localSession.id;
+  }
+
+  async function startWorkout() {
+    await ensureWorkoutSessionStarted();
+    setExercisePickerOpen(false);
+    setExerciseFormOpen(false);
     setActiveView('record');
   }
 
-  function finishWorkout() {
+  async function finishWorkout() {
+    if (user && activeSessionId && !isLocalSession(activeSessionId)) {
+      try {
+        const finishedSession = await api.finishWorkoutSession(user.id, activeSessionId);
+        upsertSession(finishedSession);
+      } catch (error) {
+        setError(error instanceof Error ? error.message : '운동 종료에 실패했습니다.');
+      }
+    } else if (activeSessionId) {
+      setSessions((current) =>
+        current.map((session) =>
+          session.id === activeSessionId
+            ? {
+                ...session,
+                status: 'FINISHED',
+                finishedAt: new Date().toISOString(),
+                durationSeconds: Math.max(1, workoutElapsedSeconds),
+              }
+            : session,
+        ),
+      );
+    }
+
     setWorkoutStartedAt(null);
+    setActiveSessionId(null);
+    setExercisePickerOpen(false);
+    setExerciseFormOpen(false);
+  }
+
+  async function openExercisePicker() {
+    if (workoutStartedAt == null) {
+      await ensureWorkoutSessionStarted();
+    }
+
+    setSelectedMachineId(null);
+    setExerciseFormOpen(false);
+    setExercisePickerOpen(true);
+    setActiveView('record');
   }
 
   function logout() {
@@ -454,7 +640,10 @@ export function App() {
     window.localStorage.removeItem(legacyMockSessionKey);
     setWorkoutStartedAt(null);
     setWorkoutElapsedSeconds(0);
+    setActiveSessionId(null);
     setActiveWorkoutRecords([]);
+    setExercisePickerOpen(false);
+    setExerciseFormOpen(false);
     setSessions([]);
     setUser(null);
     setActiveView('home');
@@ -467,9 +656,11 @@ export function App() {
     }
 
     const validSets = sets
-      .map((set) => ({
+      .map((set, index) => ({
+        setOrder: index + 1,
         weightKg: Number(set.weightKg),
         reps: Number(set.reps),
+        completed: set.completed,
       }))
       .filter((set) => Number.isFinite(set.weightKg) && set.weightKg >= 0 && set.reps > 0);
 
@@ -481,44 +672,73 @@ export function App() {
     setSaving(true);
     setError(null);
 
-    const created: WorkoutSession = {
-      id: Date.now(),
-      workoutDate,
-      memo,
-      durationSeconds: workoutStartedAt == null ? undefined : Math.max(1, workoutElapsedSeconds),
-      records: [
-        {
-          id: Date.now() + 1,
+    const sessionId = await ensureWorkoutSessionStarted();
+
+    try {
+      if (user && sessionId && !isLocalSession(sessionId)) {
+        const updatedSession = await api.addWorkoutRecord(user.id, sessionId, {
+          catalogId: selectedMachineId,
+          note,
+          sets: validSets,
+        });
+
+        upsertSession(updatedSession);
+        setActiveWorkoutRecords(toActiveWorkoutRecords(updatedSession));
+      } else if (sessionId) {
+        const localRecord = {
+          id: `local-record-${Date.now()}`,
+          recordId: `local-record-${Date.now()}`,
           machineId: selectedMachineId,
           machineName: selectedMachine?.name ?? '선택 기구',
+          catalogId: selectedMachineId,
+          exerciseName: selectedMachine?.name ?? '선택 기구',
+          muscleGroup: selectedMachine?.muscleGroup,
           muscleGroupLabel: selectedMachine?.muscleGroupLabel ?? '',
+          movementPattern: selectedMachine?.movementPattern,
           note,
-          sets: validSets.map((set, index) => ({
-            setOrder: index + 1,
+          sets: validSets.map((set) => ({
+            setOrder: set.setOrder,
             weightKg: String(set.weightKg),
             reps: set.reps,
+            completed: set.completed,
           })),
-        },
-      ],
-    };
+          createdAt: new Date().toISOString(),
+        };
+        let nextSession: WorkoutSession | null = null;
 
-    window.setTimeout(() => {
-      setSessions((current) => [created, ...current]);
-      if (workoutStartedAt != null) {
-        setActiveWorkoutRecords((current) => [
-          {
-            id: created.records[0].id,
-            machineName: created.records[0].machineName,
-            muscleGroupLabel: created.records[0].muscleGroupLabel,
-            setsCount: created.records[0].sets.length,
-            workoutDate: created.workoutDate,
-          },
-          ...current,
-        ]);
+        setSessions((current) =>
+          current.map((session) => {
+            if (session.id !== sessionId) {
+              return session;
+            }
+
+            nextSession = {
+              ...session,
+              memo,
+              records: [...session.records, localRecord],
+            };
+            return nextSession;
+          }),
+        );
+
+        const activeRecord: ActiveWorkoutRecord = {
+          id: localRecord.id,
+          machineName: localRecord.machineName,
+          muscleGroupLabel: localRecord.muscleGroupLabel,
+          setsCount: localRecord.sets.length,
+          workoutDate,
+        };
+        setActiveWorkoutRecords((current) => [activeRecord, ...current]);
       }
+
       resetDraft();
+      setExercisePickerOpen(false);
+      setExerciseFormOpen(false);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '운동 기록 저장에 실패했습니다.');
+    } finally {
       setSaving(false);
-    }, 250);
+    }
   }
 
   return (
@@ -603,7 +823,7 @@ export function App() {
                   </button>
                 ) : (
                   <>
-                    <button className="secondary-button" type="button" onClick={() => setActiveView('record')}>
+                    <button className="secondary-button" type="button" onClick={openExercisePicker}>
                       <Plus size={16} />
                       기록 추가
                     </button>
@@ -643,7 +863,7 @@ export function App() {
             </div>
 
             <div className="home-actions-grid">
-              <button type="button" onClick={() => setActiveView('record')}>
+              <button type="button" onClick={openExercisePicker}>
                 <strong>새 운동 기록</strong>
                 <span>기구를 고르고 세트별 무게/횟수를 입력합니다.</span>
               </button>
@@ -808,233 +1028,329 @@ export function App() {
         )}
 
         {activeView === 'record' && (
-          <>
-        <div className="section-heading">
-          <div>
-            <h2>{machines.length}개의 운동 기구를 선택할 수 있어요!</h2>
-            <p>부위를 고르고 오늘 수행한 기구를 선택하세요.</p>
-          </div>
-          <button className="link-button" type="button">
-            전체보기
-            <ChevronRight size={16} />
-          </button>
-        </div>
-
-        {workoutStartedAt != null && (
-          <section className="active-workout-strip">
-            <div>
-              <span>진행 중인 운동</span>
-              <strong>{formatSeconds(workoutElapsedSeconds)}</strong>
-            </div>
-            <p>
-              {activeWorkoutRecords.length === 0
-                ? '첫 종목을 저장하면 운동 요약에 추가됩니다.'
-                : `${activeWorkoutRecords.map((record) => record.machineName).join(', ')} 기록됨`}
-            </p>
-            <button className="secondary-button" type="button" onClick={finishWorkout}>
-              운동 종료
-            </button>
-          </section>
-        )}
-
-        <div className="segment-control">
-          {muscleGroups.map((group) => (
-            <button
-              className={selectedGroup === group.value ? 'active' : ''}
-              key={group.value}
-              type="button"
-              onClick={() => {
-                setSelectedGroup(group.value);
-                setSelectedMachineId(null);
-              }}
-            >
-              {group.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="machine-card-grid">
-          {machines.map((machine) => (
-            <button
-              className={selectedMachineId === machine.id ? 'machine-card selected' : 'machine-card'}
-              key={machine.id}
-              type="button"
-              onClick={() => setSelectedMachineId(machine.id)}
-            >
-              <div className="machine-card-top">
-                <span className="machine-avatar">
-                  <Dumbbell size={18} />
-                </span>
-                <span className="status-dot" />
-              </div>
-              <strong>{machine.name}</strong>
-              <p>{machine.description}</p>
-              <div className="machine-tags">
-                <span>#{machine.muscleGroupLabel}</span>
-                <span>#{machine.movementPattern}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <section className="record-layout">
-          <form className="record-form" onSubmit={submitWorkout}>
-            <div className="form-title">
+          <section className="record-session-page">
+            <div className="record-session-head">
               <div>
-                <span className="eyebrow">{selectedMachine?.muscleGroupLabel ?? '기구 선택'}</span>
-                <h2>{selectedMachine?.name ?? '오늘 운동한 기구를 선택하세요'}</h2>
-                <p>{selectedMachine?.description ?? '기구를 선택하면 기록 입력과 이전 기록이 연결됩니다.'}</p>
+                <span>{workoutStartedAt == null ? '오늘 운동' : `진행 중 ${formatSeconds(workoutElapsedSeconds)}`}</span>
+                <h2>{workoutDateLabel}</h2>
+                <p>
+                  {visibleWorkoutRecords.length === 0
+                    ? '운동을 시작하고 오늘 기록할 종목을 추가하세요.'
+                    : `${visibleWorkoutRecords.length}개 운동, ${visibleWorkoutSetCount}세트가 오늘 기록에 올라와 있습니다.`}
+                </p>
               </div>
-              <div className="mini-metric">
-                <Activity size={18} />
-                <strong>{totalDraftSets}</strong>
-                <span>입력 세트</span>
-              </div>
-            </div>
-
-            <div className="form-row">
-              <label>
-                <span>운동일</span>
-                <input value={workoutDate} onChange={(event) => setWorkoutDate(event.target.value)} type="date" />
-              </label>
-              <label>
-                <span>세션 메모</span>
-                <input value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="예: 하체 볼륨 데이" />
-              </label>
-            </div>
-
-            <div className="sets-header">
-              <div>
-                <h3>세트 기록</h3>
-                <p>완료를 누르면 설정한 휴식 타이머가 시작됩니다.</p>
-              </div>
-              <div className="set-tools">
-                <div className="rest-stepper" aria-label="세트간 휴식 시간 설정">
-                  <button
-                    aria-label="휴식 시간 10초 줄이기"
-                    type="button"
-                    onClick={() => updateRestDuration(restDurationSeconds - 10)}
-                    disabled={restDurationSeconds <= minRestSeconds}
-                  >
-                    <Minus size={15} />
-                  </button>
-                  <span>
-                    <Timer size={15} />
-                    {formatSeconds(restDurationSeconds)}
-                  </span>
-                  <button
-                    aria-label="휴식 시간 10초 늘리기"
-                    type="button"
-                    onClick={() => updateRestDuration(restDurationSeconds + 10)}
-                    disabled={restDurationSeconds >= maxRestSeconds}
-                  >
-                    <Plus size={15} />
-                  </button>
-                </div>
-                <button type="button" onClick={addSet}>
-                  <Plus size={16} />
-                  세트 추가
+              <div className="record-session-head-actions">
+                <button
+                  className={workoutStartedAt == null ? 'session-timer-button' : 'session-timer-button running'}
+                  type="button"
+                  onClick={workoutStartedAt == null ? startWorkout : finishWorkout}
+                >
+                  {workoutStartedAt == null ? <Timer size={18} /> : <CheckCircle2 size={18} />}
+                  <span>{workoutStartedAt == null ? '운동 시작' : formatSeconds(workoutElapsedSeconds)}</span>
+                  <small>{workoutStartedAt == null ? '타이머 시작' : '누르면 종료'}</small>
+                </button>
+                <button className="icon-button" type="button" aria-label="운동 옵션">
+                  <span />
+                  <span />
+                  <span />
                 </button>
               </div>
             </div>
 
-            <div className="set-grid">
-              {sets.map((set, index) => (
-                <div className={set.completed ? 'set-row completed' : 'set-row'} key={set.id}>
-                  <span className="set-number">{index + 1}</span>
-                  <input
-                    inputMode="decimal"
-                    placeholder="무게 kg"
-                    value={set.weightKg}
-                    onChange={(event) => updateSet(set.id, 'weightKg', event.target.value)}
-                  />
-                  <input
-                    inputMode="numeric"
-                    placeholder="횟수"
-                    value={set.reps}
-                    onChange={(event) => updateSet(set.id, 'reps', event.target.value)}
-                  />
-                  <button
-                    className="complete-set-button"
-                    type="button"
-                    onClick={() => toggleSetComplete(set.id)}
-                  >
-                    <CheckCircle2 size={16} />
-                    {set.completed ? '완료됨' : '완료'}
+            <section className={workoutStartedAt == null ? 'workout-log-stage' : 'workout-log-stage active'}>
+              <div className="muscle-visual-card" aria-label="오늘 운동 부위 비주얼" />
+
+              <div className="workout-log-list">
+                {visibleWorkoutRecords.length === 0 && (
+                  <article className="workout-log-empty">
+                    <Dumbbell size={24} />
+                    <strong>아직 추가된 운동이 없습니다</strong>
+                    <p>운동 추가를 누르면 부위별 운동 목록과 세트 입력 화면이 열립니다.</p>
+                  </article>
+                )}
+                {visibleWorkoutRecords.map((record) => (
+                  <article className="workout-log-item" key={`${record.id}-${record.workoutDate}`}>
+                    <span className="workout-log-thumb">
+                      <Dumbbell size={24} />
+                    </span>
+                    <div>
+                      <strong>{record.machineName}</strong>
+                      <p>{record.muscleGroupLabel} · {record.setsCount}세트</p>
+                    </div>
+                    <button className="icon-button" type="button" aria-label={`${record.machineName} 옵션`}>
+                      <span />
+                      <span />
+                      <span />
+                    </button>
+                  </article>
+                ))}
+              </div>
+
+              <div className="workout-record-actions">
+                {workoutStartedAt == null ? (
+                  <button className="start-workout-button" type="button" onClick={startWorkout}>
+                    <Timer size={20} />
+                    시작
                   </button>
-                  <strong className={set.remainingSeconds > 0 ? 'rest-timer active' : 'rest-timer'}>
-                    <Timer size={16} />
-                    {set.completed
-                      ? set.remainingSeconds > 0
-                        ? formatSeconds(set.remainingSeconds)
-                        : '휴식 끝'
-                      : formatSeconds(restDurationSeconds)}
-                  </strong>
+                ) : (
+                  <button className="start-workout-button" type="button" onClick={finishWorkout}>
+                    <CheckCircle2 size={20} />
+                    종료
+                  </button>
+                )}
+                <button className="add-workout-button" type="button" onClick={openExercisePicker}>
+                  <Plus size={24} />
+                  운동 추가
+                </button>
+              </div>
+            </section>
+
+            {exercisePickerOpen && (
+              <div className="exercise-picker-backdrop" role="presentation">
+              <section className="exercise-picker-panel" role="dialog" aria-modal="true" aria-label="운동 추가">
+                <div className="section-heading compact">
+                  <div>
+                    <h2>{exerciseFormOpen ? selectedMachine?.name ?? '세트 설정' : `${machines.length}개의 운동 기구`}</h2>
+                    <p>
+                      {exerciseFormOpen
+                        ? '세트별 무게와 횟수를 입력하고 완료를 누르면 휴식 타이머가 시작됩니다.'
+                        : '부위를 고르고 오늘 수행한 운동을 선택하세요.'}
+                    </p>
+                  </div>
                   <button
-                    aria-label={`${index + 1}세트 삭제`}
-                    className="delete-set-button"
+                    className="link-button"
                     type="button"
-                    onClick={() => deleteSet(set.id)}
-                    disabled={sets.length === 1}
+                    onClick={() => {
+                      setExercisePickerOpen(false);
+                      setExerciseFormOpen(false);
+                    }}
                   >
-                    <Trash2 size={16} />
+                    닫기
+                    <ChevronRight size={16} />
                   </button>
                 </div>
-              ))}
-            </div>
 
-            <label className="note-field">
-              <span>기구별 메모</span>
-              <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="자세, 느낌, 다음 목표" />
-            </label>
+                {!exerciseFormOpen && (
+                  <>
+                    <div className="segment-control">
+                      {muscleGroups.map((group) => (
+                        <button
+                          className={selectedGroup === group.value ? 'active' : ''}
+                          key={group.value}
+                          type="button"
+                          onClick={() => {
+                            setSelectedGroup(group.value);
+                            setSelectedMachineId(null);
+                            setExerciseFormOpen(false);
+                          }}
+                        >
+                          {group.label}
+                        </button>
+                      ))}
+                    </div>
 
-            {error && <p className="error-message">{error}</p>}
+                    <div className="machine-card-grid compact">
+                      {machines.map((machine) => (
+                        <button
+                          className={selectedMachineId === machine.id ? 'machine-card selected' : 'machine-card'}
+                          key={machine.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedMachineId(machine.id);
+                            setExerciseFormOpen(true);
+                          }}
+                        >
+                          <div className="machine-card-top">
+                            <span className="machine-avatar">
+                              <Dumbbell size={18} />
+                            </span>
+                            <span className="status-dot" />
+                          </div>
+                          <strong>{machine.name}</strong>
+                          <p>{machine.description}</p>
+                          <div className="machine-tags">
+                            <span>#{machine.muscleGroupLabel}</span>
+                            <span>#{machine.movementPattern}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
 
-            <div className="form-actions">
-              <button className="secondary-button" type="button" onClick={resetDraft}>
-                <RotateCcw size={16} />
-                초기화
-              </button>
-              <button className="primary-button" type="submit" disabled={saving || selectedMachineId == null}>
-                <Save size={16} />
-                {saving ? '저장 중' : '기록 저장'}
-              </button>
-            </div>
-          </form>
+                {exerciseFormOpen && (
+                <section className="record-layout exercise-detail-layout">
+                  <form className="record-form" onSubmit={submitWorkout}>
+                    <div className="form-title">
+                      <div>
+                        <span className="eyebrow">{selectedMachine?.muscleGroupLabel ?? '기구 선택'}</span>
+                        <h2>{selectedMachine?.name ?? '오늘 운동한 기구를 선택하세요'}</h2>
+                        <p>{selectedMachine?.description ?? '기구를 선택하면 기록 입력과 이전 기록이 연결됩니다.'}</p>
+                      </div>
+                      <div className="mini-metric">
+                        <Activity size={18} />
+                        <strong>{totalDraftSets}</strong>
+                        <span>입력 세트</span>
+                      </div>
+                    </div>
 
-          <aside className="insight-panel">
-            <div className="insight-card">
-              <div className="panel-title">
-                <Trophy size={18} />
-                <h3>선택 기구 요약</h3>
+                    <div className="form-row">
+                      <label>
+                        <span>운동일</span>
+                        <input value={workoutDate} onChange={(event) => setWorkoutDate(event.target.value)} type="date" />
+                      </label>
+                      <label>
+                        <span>세션 메모</span>
+                        <input value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="예: 하체 볼륨 데이" />
+                      </label>
+                    </div>
+
+                    <div className="sets-header">
+                      <div>
+                        <h3>세트 기록</h3>
+                        <p>완료를 누르면 설정한 휴식 타이머가 시작됩니다.</p>
+                      </div>
+                      <div className="set-tools">
+                        <div className="rest-stepper" aria-label="세트간 휴식 시간 설정">
+                          <button
+                            aria-label="휴식 시간 10초 줄이기"
+                            type="button"
+                            onClick={() => updateRestDuration(restDurationSeconds - 10)}
+                            disabled={restDurationSeconds <= minRestSeconds}
+                          >
+                            <Minus size={15} />
+                          </button>
+                          <span>
+                            <Timer size={15} />
+                            {formatSeconds(restDurationSeconds)}
+                          </span>
+                          <button
+                            aria-label="휴식 시간 10초 늘리기"
+                            type="button"
+                            onClick={() => updateRestDuration(restDurationSeconds + 10)}
+                            disabled={restDurationSeconds >= maxRestSeconds}
+                          >
+                            <Plus size={15} />
+                          </button>
+                        </div>
+                        <button type="button" onClick={addSet}>
+                          <Plus size={16} />
+                          세트 추가
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="set-grid">
+                      {sets.map((set, index) => (
+                        <div className={set.completed ? 'set-row completed' : 'set-row'} key={set.id}>
+                          <span className="set-number">{index + 1}</span>
+                          <input
+                            inputMode="decimal"
+                            placeholder="무게 kg"
+                            value={set.weightKg}
+                            onChange={(event) => updateSet(set.id, 'weightKg', event.target.value)}
+                          />
+                          <input
+                            inputMode="numeric"
+                            placeholder="횟수"
+                            value={set.reps}
+                            onChange={(event) => updateSet(set.id, 'reps', event.target.value)}
+                          />
+                          <button
+                            className="complete-set-button"
+                            type="button"
+                            onClick={() => toggleSetComplete(set.id)}
+                          >
+                            <CheckCircle2 size={16} />
+                            {set.completed ? '완료됨' : '완료'}
+                          </button>
+                          <strong className={set.remainingSeconds > 0 ? 'rest-timer active' : 'rest-timer'}>
+                            <Timer size={16} />
+                            {set.completed
+                              ? set.remainingSeconds > 0
+                                ? formatSeconds(set.remainingSeconds)
+                                : '휴식 끝'
+                              : formatSeconds(restDurationSeconds)}
+                          </strong>
+                          <button
+                            aria-label={`${index + 1}세트 삭제`}
+                            className="delete-set-button"
+                            type="button"
+                            onClick={() => deleteSet(set.id)}
+                            disabled={sets.length === 1}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <label className="note-field">
+                      <span>기구별 메모</span>
+                      <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="자세, 느낌, 다음 목표" />
+                    </label>
+
+                    {error && <p className="error-message">{error}</p>}
+
+                    <div className="form-actions">
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => {
+                          setSelectedMachineId(null);
+                          setExerciseFormOpen(false);
+                        }}
+                      >
+                        운동 다시 선택
+                      </button>
+                      <button className="secondary-button" type="button" onClick={resetDraft}>
+                        <RotateCcw size={16} />
+                        초기화
+                      </button>
+                      <button className="primary-button" type="submit" disabled={saving || selectedMachineId == null}>
+                        <Save size={16} />
+                        {saving ? '저장 중' : '기록 저장'}
+                      </button>
+                    </div>
+                  </form>
+
+                  <aside className="insight-panel">
+                    <div className="insight-card">
+                      <div className="panel-title">
+                        <Trophy size={18} />
+                        <h3>선택 기구 요약</h3>
+                      </div>
+                      <strong>{selectedMachine?.name ?? '기구 미선택'}</strong>
+                      <p>
+                        {latestHistory
+                          ? `${latestHistory.workoutDate}에 ${latestHistory.sets.length}세트 수행`
+                          : '아직 이 기구의 이전 기록이 없습니다.'}
+                      </p>
+                    </div>
+
+                    <div className="panel-title history-title">
+                      <History size={18} />
+                      <h3>이전 기록</h3>
+                    </div>
+                    <div className="history-list" id="history">
+                      {history.length === 0 && <p className="empty">아직 이 기구의 기록이 없습니다.</p>}
+                      {history.map((item) => (
+                        <article className="history-card" key={item.recordId}>
+                          <div>
+                            <strong>{item.workoutDate}</strong>
+                            <span>{item.sets.length}세트</span>
+                          </div>
+                          <p>{item.sets.map((set) => `${set.weightKg}kg x ${set.reps}`).join(' / ')}</p>
+                        </article>
+                      ))}
+                    </div>
+                  </aside>
+                </section>
+                )}
+              </section>
               </div>
-              <strong>{selectedMachine?.name ?? '기구 미선택'}</strong>
-              <p>
-                {latestHistory
-                  ? `${latestHistory.workoutDate}에 ${latestHistory.sets.length}세트 수행`
-                  : '아직 이 기구의 이전 기록이 없습니다.'}
-              </p>
-            </div>
-
-            <div className="panel-title history-title">
-              <History size={18} />
-              <h3>이전 기록</h3>
-            </div>
-            <div className="history-list" id="history">
-              {history.length === 0 && <p className="empty">아직 이 기구의 기록이 없습니다.</p>}
-              {history.map((item) => (
-                <article className="history-card" key={item.recordId}>
-                  <div>
-                    <strong>{item.workoutDate}</strong>
-                    <span>{item.sets.length}세트</span>
-                  </div>
-                  <p>{item.sets.map((set) => `${set.weightKg}kg x ${set.reps}`).join(' / ')}</p>
-                </article>
-              ))}
-            </div>
-          </aside>
-        </section>
-          </>
+            )}
+          </section>
         )}
 
         {activeView === 'history' && (

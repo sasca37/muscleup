@@ -1,32 +1,83 @@
-import { Activity, Dumbbell, LogIn, TrendingUp } from 'lucide-react';
+import { Activity, Dumbbell, LogIn, TrendingUp, UserPlus } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 import { api } from '../api/client';
-import type { User } from '../types/domain';
+import type { AgeGroup, Gender, RegisterPayload, User, WorkoutGoal } from '../types/domain';
 
 type LoginGateProps = {
   onLoginSuccess: (user: User) => void;
 };
 
-export function LoginGate({ onLoginSuccess }: LoginGateProps) {
-  const [loginOpen, setLoginOpen] = useState(false);
-  const [loginId, setLoginId] = useState('');
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [loggingIn, setLoggingIn] = useState(false);
+type AuthMode = 'login' | 'register';
 
-  async function submitLogin(event: FormEvent<HTMLFormElement>) {
+const workoutGoalOptions: { value: WorkoutGoal; label: string }[] = [
+  { value: 'DIET', label: '다이어트' },
+  { value: 'MUSCLE_GAIN', label: '근비대' },
+  { value: 'HEALTH', label: '건강' },
+];
+
+const genderOptions: { value: Gender; label: string }[] = [
+  { value: 'MALE', label: '남' },
+  { value: 'FEMALE', label: '여' },
+];
+
+const ageGroupOptions: { value: AgeGroup; label: string }[] = [
+  { value: 'AGE_10S', label: '10대' },
+  { value: 'AGE_20S', label: '20대' },
+  { value: 'AGE_30S', label: '30대' },
+  { value: 'AGE_40S', label: '40대' },
+  { value: 'AGE_50S', label: '50대' },
+  { value: 'AGE_60S', label: '60대' },
+  { value: 'AGE_70S', label: '70대' },
+  { value: 'AGE_80S', label: '80대' },
+  { value: 'AGE_90S', label: '90대' },
+];
+
+export function LoginGate({ onLoginSuccess }: LoginGateProps) {
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [nickname, setNickname] = useState('');
+  const [workoutGoal, setWorkoutGoal] = useState<WorkoutGoal>('MUSCLE_GAIN');
+  const [gender, setGender] = useState<Gender>('MALE');
+  const [ageGroup, setAgeGroup] = useState<AgeGroup>('AGE_30S');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  function openAuth(mode: AuthMode) {
+    setAuthMode(mode);
+    setAuthError(null);
+    setAuthOpen(true);
+  }
+
+  async function submitAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setLoggingIn(true);
-    setLoginError(null);
+    setSubmitting(true);
+    setAuthError(null);
 
     try {
-      const user = await api.login(loginId);
+      const user =
+        authMode === 'login'
+          ? await api.login({ email, password })
+          : await api.register(createRegisterPayload());
       onLoginSuccess(user);
-      setLoginOpen(false);
+      setAuthOpen(false);
     } catch (error) {
-      setLoginError(error instanceof Error ? error.message : '로그인에 실패했습니다.');
+      setAuthError(error instanceof Error ? error.message : '요청 처리에 실패했습니다.');
     } finally {
-      setLoggingIn(false);
+      setSubmitting(false);
     }
+  }
+
+  function createRegisterPayload(): RegisterPayload {
+    return {
+      email,
+      password,
+      nickname,
+      workoutGoal,
+      gender,
+      ageGroup,
+    };
   }
 
   return (
@@ -40,15 +91,26 @@ export function LoginGate({ onLoginSuccess }: LoginGateProps) {
           <a href="#preview">미리보기</a>
           <a href="#start">시작하기</a>
         </nav>
-        <button
-          aria-expanded={loginOpen}
-          className="public-login-button"
-          type="button"
-          onClick={() => setLoginOpen((current) => !current)}
-        >
-          <LogIn size={17} />
-          로그인
-        </button>
+        <div className="public-auth-actions">
+          <button
+            aria-expanded={authOpen && authMode === 'login'}
+            className="public-login-button"
+            type="button"
+            onClick={() => openAuth('login')}
+          >
+            <LogIn size={17} />
+            로그인
+          </button>
+          <button
+            aria-expanded={authOpen && authMode === 'register'}
+            className="public-register-button"
+            type="button"
+            onClick={() => openAuth('register')}
+          >
+            <UserPlus size={17} />
+            회원가입
+          </button>
+        </div>
       </header>
 
       <section className="public-hero" id="start">
@@ -64,53 +126,18 @@ export function LoginGate({ onLoginSuccess }: LoginGateProps) {
             Repick은 운동 기구별 무게, 횟수, 이전 기록을 빠르게 확인하는 헬스 기록 서비스입니다.
           </p>
           <div className="public-actions">
-            <button className="primary-button" type="button" onClick={() => setLoginOpen(true)}>
+            <button className="primary-button" type="button" onClick={() => openAuth('register')}>
+              <UserPlus size={16} />
+              회원가입하고 기록하기
+            </button>
+            <button className="secondary-auth-button" type="button" onClick={() => openAuth('login')}>
               <LogIn size={16} />
-              로그인하고 기록하기
+              로그인
             </button>
             <a className="secondary-link" href="#features">
               둘러보기
             </a>
           </div>
-
-          {loginOpen && (
-            <div className="login-modal-backdrop" role="presentation" onClick={() => setLoginOpen(false)}>
-              <section
-                aria-label="로그인 선택"
-                aria-modal="true"
-                className="login-modal"
-                role="dialog"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <button className="modal-close-button" type="button" onClick={() => setLoginOpen(false)}>
-                  닫기
-                </button>
-                <strong className="login-wordmark">Repick</strong>
-                <h2>ID로 시작하기</h2>
-                <p>입력한 ID가 있으면 바로 로그인하고, 없으면 새 유저로 자동 가입됩니다.</p>
-                <form className="login-id-form" onSubmit={submitLogin}>
-                  <label>
-                    <span>로그인 ID</span>
-                    <input
-                      autoFocus
-                      inputMode="text"
-                      maxLength={30}
-                      minLength={3}
-                      pattern="[A-Za-z0-9._-]{3,30}"
-                      placeholder="예: sasca37"
-                      value={loginId}
-                      onChange={(event) => setLoginId(event.target.value)}
-                    />
-                  </label>
-                  {loginError && <p className="error-message">{loginError}</p>}
-                  <button className="login-button primary-login" type="submit" disabled={loggingIn}>
-                    {loggingIn ? '확인 중' : '로그인 / 가입'}
-                  </button>
-                </form>
-                <span className="mock-login-note">영문, 숫자, '.', '_', '-' 조합 3~30자를 사용할 수 있습니다.</span>
-              </section>
-            </div>
-          )}
         </div>
 
         <div className="phone-preview" id="preview" aria-label="앱 화면 미리보기">
@@ -158,6 +185,118 @@ export function LoginGate({ onLoginSuccess }: LoginGateProps) {
           <span>작은 화면에서도 CTA, 카드, 입력 흐름이 한 줄로 자연스럽게 접힙니다.</span>
         </article>
       </section>
+
+      {authOpen && (
+        <div className="login-modal-backdrop" role="presentation">
+          <section
+            aria-label={authMode === 'login' ? '로그인' : '회원가입'}
+            aria-modal="true"
+            className="login-modal"
+            role="dialog"
+          >
+            <button className="modal-close-button" type="button" onClick={() => setAuthOpen(false)}>
+              닫기
+            </button>
+            <strong className="login-wordmark">Repick</strong>
+            <h2>{authMode === 'login' ? '로그인' : '회원가입'}</h2>
+            <p>
+              {authMode === 'login'
+                ? '가입한 이메일과 비밀번호로 운동 기록을 이어갑니다.'
+                : '이메일은 추후 인증에 사용할 예정입니다.'}
+            </p>
+
+            <div className="auth-mode-tabs" aria-label="인증 방식 선택">
+              <button className={authMode === 'login' ? 'active' : ''} type="button" onClick={() => setAuthMode('login')}>
+                로그인
+              </button>
+              <button className={authMode === 'register' ? 'active' : ''} type="button" onClick={() => setAuthMode('register')}>
+                회원가입
+              </button>
+            </div>
+
+            <form className="login-id-form" onSubmit={submitAuth}>
+              <label>
+                <span>아이디 (이메일)</span>
+                <input
+                  autoFocus
+                  inputMode="email"
+                  placeholder="you@example.com"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>비밀번호</span>
+                <input
+                  minLength={8}
+                  placeholder="8자 이상"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </label>
+
+              {authMode === 'register' && (
+                <>
+                  <label>
+                    <span>닉네임</span>
+                    <input
+                      maxLength={20}
+                      minLength={2}
+                      placeholder="예: 운동하는사람"
+                      value={nickname}
+                      onChange={(event) => setNickname(event.target.value)}
+                    />
+                  </label>
+                  <div className="register-field-grid">
+                    <label>
+                      <span>운동목적</span>
+                      <select value={workoutGoal} onChange={(event) => setWorkoutGoal(event.target.value as WorkoutGoal)}>
+                        {workoutGoalOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>성별</span>
+                      <select value={gender} onChange={(event) => setGender(event.target.value as Gender)}>
+                        {genderOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>연령대</span>
+                      <select value={ageGroup} onChange={(event) => setAgeGroup(event.target.value as AgeGroup)}>
+                        {ageGroupOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </>
+              )}
+
+              {authError && <p className="error-message">{authError}</p>}
+              <button className="login-button primary-login" type="submit" disabled={submitting}>
+                {submitting ? '처리 중' : authMode === 'login' ? '로그인' : '회원가입'}
+              </button>
+            </form>
+            <span className="mock-login-note">
+              {authMode === 'login'
+                ? '비밀번호는 서버에서 해시로 검증됩니다.'
+                : '소셜 로그인과 이메일 인증은 추후 연결 예정입니다.'}
+            </span>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
