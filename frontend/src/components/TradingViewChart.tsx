@@ -33,7 +33,7 @@ export function TradingViewChart({ symbol }: TradingViewChartProps) {
       locale: 'kr',
       backgroundColor: 'rgba(5, 10, 24, 1)',
       gridColor: 'rgba(72, 92, 136, 0.18)',
-      hide_top_toolbar: false,
+      hide_top_toolbar: true,
       hide_side_toolbar: true,
       allow_symbol_change: true,
       save_image: false,
