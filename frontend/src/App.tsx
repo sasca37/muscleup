@@ -1452,17 +1452,6 @@ export function App() {
                       </div>
                     </div>
 
-                    <div className="form-row">
-                      <label>
-                        <span>운동일</span>
-                        <input value={workoutDate} onChange={(event) => setWorkoutDate(event.target.value)} type="date" />
-                      </label>
-                      <label>
-                        <span>세션 메모</span>
-                        <input value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="예: 하체 볼륨 데이" />
-                      </label>
-                    </div>
-
                     <div className="sets-header">
                       <div>
                         <h3>세트 기록</h3>
@@ -1517,10 +1506,11 @@ export function App() {
                           <button
                             className="complete-set-button"
                             type="button"
+                            aria-label={`${index + 1}세트 완료`}
                             onClick={() => toggleSetComplete(set.id)}
                           >
                             <CheckCircle2 size={16} />
-                            {set.completed ? '완료됨' : '완료'}
+                            <span>{set.completed ? '완료됨' : '완료'}</span>
                           </button>
                           <strong className={set.remainingSeconds > 0 ? 'rest-timer active' : 'rest-timer'}>
                             <Timer size={16} />

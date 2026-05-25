@@ -2514,10 +2514,20 @@ button.calendar-day {
   .public-topbar {
     position: sticky;
     top: 0;
+    z-index: 50;
+    display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 8px;
-    min-height: 58px;
-    padding: 10px 16px;
+    grid-template-areas:
+      "brand auth"
+      "nav nav";
+    gap: 10px 12px;
+    min-height: 0;
+    justify-items: stretch;
+    border-bottom: 1px solid #dde5ef;
+    background: rgba(255, 255, 255, 0.98);
+    padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+    box-shadow: 0 8px 24px rgba(15, 31, 56, 0.08);
+    backdrop-filter: blur(16px);
   }
 
   .brand-home-button {
@@ -2558,11 +2568,48 @@ button.calendar-day {
   }
 
   .public-nav {
+    grid-area: nav;
+    display: flex;
     width: 100%;
     justify-content: flex-start;
-    gap: 10px;
+    gap: 6px;
     overflow-x: auto;
-    padding-bottom: 4px;
+    border: 1px solid #dfe6f0;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.96);
+    padding: 4px;
+    scrollbar-width: none;
+  }
+
+  .public-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .public-nav a {
+    flex: 0 0 auto;
+    min-width: 74px;
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    padding: 0 12px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .public-auth-actions {
+    grid-area: auth;
+    justify-self: end;
+    gap: 6px;
+  }
+
+  .public-login-button,
+  .public-register-button {
+    min-width: 0;
+    min-height: 40px;
+    padding: 8px 10px;
+    font-size: 13px;
   }
 
   .main-nav button {
@@ -2587,6 +2634,11 @@ button.calendar-day {
   .main-nav button,
   .public-nav a {
     font-size: 13px;
+  }
+
+  .public-topbar .brand-home-button {
+    grid-area: brand;
+    justify-self: start;
   }
 
   .public-hero {
@@ -2824,17 +2876,29 @@ button.calendar-day {
     flex: 1;
   }
 
+  .set-grid {
+    gap: 12px;
+  }
+
   .set-row {
-    grid-template-columns: 36px minmax(0, 1fr) minmax(0, 1fr) 38px;
+    grid-template-columns: 42px minmax(72px, 0.9fr) minmax(64px, 0.8fr) 42px 42px;
     grid-template-areas:
-      "number weight reps delete"
-      "complete complete timer timer";
-    padding: 8px;
+      "number weight reps complete delete"
+      "timer timer timer timer timer";
+    gap: 8px;
     border-color: #e1e6ee;
+    border-radius: 12px;
+    background: #ffffff;
+    padding: 9px;
   }
 
   .set-number {
     grid-area: number;
+    align-self: stretch;
+    height: auto;
+    min-height: 48px;
+    border-radius: 12px;
+    font-size: 18px;
   }
 
   .set-row input:first-of-type {
@@ -2845,23 +2909,43 @@ button.calendar-day {
     grid-area: reps;
   }
 
+  .set-row input {
+    min-height: 48px;
+    border-radius: 12px;
+    padding: 10px 9px;
+    font-size: 16px;
+    font-weight: 800;
+    text-align: center;
+  }
+
   .complete-set-button {
     grid-area: complete;
+    width: 100%;
+    min-height: 48px;
+    border-radius: 12px;
+    padding: 0;
+  }
+
+  .complete-set-button span {
+    display: none;
   }
 
   .rest-timer {
     grid-area: timer;
+    min-height: 38px;
+    border-radius: 10px;
+    font-size: 14px;
   }
 
   .delete-set-button {
     grid-area: delete;
+    align-self: stretch;
+    width: 100%;
+    min-height: 48px;
+    border-radius: 12px;
   }
 
   .machine-card {
     min-height: 0;
-  }
-
-  .set-number {
-    height: 32px;
   }
 }
