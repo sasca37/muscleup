@@ -40,11 +40,14 @@ export type RegisterPayload = LoginPayload & {
 
 export type ExerciseMachine = {
   id: number;
+  mongoId?: string;
   name: string;
   muscleGroup: MuscleGroup;
   muscleGroupLabel: string;
   movementPattern: string;
   description: string | null;
+  custom?: boolean;
+  deletable?: boolean;
 };
 
 export type WorkoutSet = {
@@ -102,4 +105,11 @@ export type AddWorkoutRecordPayload = {
     reps: number;
     completed?: boolean;
   }[];
+};
+
+export type CreateCustomExercisePayload = {
+  name: string;
+  muscleGroup: MuscleGroup;
+  movementPattern?: string;
+  description?: string;
 };

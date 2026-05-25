@@ -874,6 +874,7 @@ button {
 }
 
 .muscle-visual-card {
+  position: relative;
   display: block;
   aspect-ratio: 1804 / 872;
   min-height: 260px;
@@ -890,6 +891,88 @@ button {
 
 .muscle-visual-card > * {
   display: none;
+}
+
+.muscle-visual-card.market-mode {
+  display: grid;
+  background: #050a18;
+}
+
+.muscle-visual-card.market-mode > * {
+  display: block;
+}
+
+.tradingview-widget-container {
+  width: 100%;
+  height: 100%;
+  min-height: 260px;
+}
+
+.tradingview-widget-container__widget {
+  width: 100%;
+  height: 100%;
+}
+
+.chart-control-dock {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+
+.visual-mode-tabs {
+  display: inline-flex !important;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(5, 10, 24, 0.72);
+  padding: 4px;
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+}
+
+.visual-mode-tabs button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.visual-mode-tabs button.active {
+  background: #0a66d8;
+  color: #ffffff;
+}
+
+.chart-control-dock select {
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(5, 10, 24, 0.76);
+  color: #ffffff;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.insight-chart-card {
+  gap: 12px;
+  padding: 14px;
+}
+
+.compact-market-chart {
+  height: 240px;
+  overflow: hidden;
+  border: 1px solid #e1e6ee;
+  border-radius: 8px;
+  background: #050a18;
+}
+
+.compact-market-chart .tradingview-widget-container {
+  min-height: 240px;
 }
 
 .workout-log-list {
@@ -958,6 +1041,18 @@ button {
   margin: 5px 0 0;
   color: rgba(255, 255, 255, 0.56);
   font-size: 15px;
+}
+
+.workout-log-item small {
+  display: block;
+  margin-top: 5px;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workout-record-actions {
@@ -1108,6 +1203,7 @@ button {
 }
 
 .machine-card {
+  position: relative;
   display: grid;
   min-height: 206px;
   align-content: start;
@@ -1122,6 +1218,17 @@ button {
     border-color 160ms ease,
     box-shadow 160ms ease,
     transform 160ms ease;
+}
+
+.machine-card-select {
+  display: grid;
+  width: 100%;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
 }
 
 .machine-card:hover {
@@ -1193,6 +1300,69 @@ button {
   padding: 5px 7px;
   font-size: 12px;
   font-weight: 750;
+}
+
+.machine-delete-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid #ffd5d5;
+  border-radius: 8px;
+  background: #fff6f6;
+  color: #d93535;
+}
+
+.custom-exercise-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid #e1e8f5;
+  border-radius: 8px;
+  background: #f7fbff;
+  margin: 14px 0;
+  padding: 14px;
+}
+
+.custom-exercise-bar div,
+.custom-exercise-form label {
+  display: grid;
+  gap: 4px;
+}
+
+.custom-exercise-bar strong,
+.custom-exercise-form span {
+  color: #102849;
+  font-weight: 900;
+}
+
+.custom-exercise-bar span {
+  color: #697484;
+  font-size: 13px;
+}
+
+.custom-exercise-form {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 1.6fr auto;
+  gap: 10px;
+  align-items: end;
+  border: 1px solid #e1e6ee;
+  border-radius: 8px;
+  background: #ffffff;
+  margin-bottom: 14px;
+  padding: 14px;
+}
+
+.custom-exercise-form input {
+  width: 100%;
+  border: 1px solid #d9e0ea;
+  border-radius: 8px;
+  padding: 11px 12px;
+  font: inherit;
 }
 
 .record-layout {
@@ -1978,10 +2148,20 @@ textarea {
   font-weight: 850;
 }
 
+button.calendar-day {
+  cursor: pointer;
+}
+
 .calendar-day.trained {
   border-color: rgba(10, 102, 216, 0.3);
   background: #f1f6ff;
   color: #0a66d8;
+}
+
+.calendar-day.selected {
+  border-color: #0a66d8;
+  background: #0a66d8;
+  color: #ffffff;
 }
 
 .calendar-day small {
@@ -1995,6 +2175,173 @@ textarea {
 
 .empty-day {
   visibility: hidden;
+}
+
+.activity-date-detail,
+.workout-summary-page {
+  display: grid;
+  gap: 14px;
+}
+
+.activity-date-detail {
+  border: 1px solid #e1e6ee;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
+  box-shadow: 0 12px 28px rgba(15, 31, 56, 0.05);
+}
+
+.activity-date-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.activity-date-head div {
+  display: grid;
+  gap: 4px;
+}
+
+.activity-date-head span,
+.summary-hero-card span {
+  color: #0a66d8;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.activity-date-head strong {
+  color: #06172e;
+  font-size: 20px;
+}
+
+.activity-date-head p {
+  margin: 0;
+  color: #697484;
+  font-weight: 800;
+}
+
+.activity-session-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid #edf1f6;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #20242a;
+  padding: 13px;
+  text-align: left;
+}
+
+.activity-session-detail div {
+  display: grid;
+  gap: 4px;
+}
+
+.activity-session-detail strong {
+  color: #102849;
+}
+
+.activity-session-detail span,
+.activity-session-detail p {
+  margin: 0;
+  color: #697484;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.summary-hero-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 85% 18%, rgba(151, 95, 255, 0.42), transparent 30%),
+    linear-gradient(135deg, #071225, #123b7a 58%, #0a66d8);
+  color: #ffffff;
+  padding: 24px;
+}
+
+.summary-hero-card div {
+  display: grid;
+  gap: 8px;
+}
+
+.summary-hero-card strong {
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.summary-hero-card p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.summary-volume {
+  min-width: 160px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 16px;
+}
+
+.summary-volume small {
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 800;
+}
+
+.summary-part-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.summary-part-row span {
+  border-radius: 8px;
+  background: #f1f6ff;
+  color: #0a66d8;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.summary-record-list {
+  display: grid;
+  gap: 10px;
+}
+
+.summary-record-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e1e6ee;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
+  box-shadow: 0 10px 24px rgba(15, 31, 56, 0.04);
+}
+
+.summary-record-card div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.summary-record-card strong {
+  color: #102849;
+}
+
+.summary-record-card span,
+.summary-record-card small {
+  color: #697484;
+  font-weight: 800;
+}
+
+.summary-record-card p {
+  margin: 0;
+  color: #20242a;
+  font-weight: 850;
 }
 
 .session-gallery {
@@ -2013,6 +2360,10 @@ textarea {
     radial-gradient(circle at 24% 20%, rgba(150, 221, 255, 0.92), transparent 25%),
     linear-gradient(135deg, #0a66d8 0%, #0b2045 62%, #071225 100%);
   box-shadow: 0 14px 30px rgba(15, 31, 56, 0.12);
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
 }
 
 .session-tile:nth-child(3n + 1) {
@@ -2123,8 +2474,10 @@ textarea {
 
   .home-actions-grid,
   .activity-overview-grid,
+  .custom-exercise-form,
   .planner-layout,
   .one-rm-layout,
+  .summary-hero-card,
   .record-layout {
     grid-template-columns: 1fr;
   }
@@ -2262,7 +2615,10 @@ textarea {
   }
 
   .section-heading,
+  .activity-date-head,
+  .custom-exercise-bar,
   .form-title,
+  .summary-record-card div,
   .sets-header {
     align-items: flex-start;
     flex-direction: column;
@@ -2377,6 +2733,23 @@ textarea {
   .calendar-card-head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .chart-control-dock {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .chart-control-dock select {
+    width: 100%;
+  }
+
+  .activity-session-detail {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .activity-session-detail p {
+    grid-column: 1 / -1;
   }
 
   .home-metrics article,

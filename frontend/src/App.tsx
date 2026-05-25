@@ -19,6 +19,7 @@ import {
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from './api/client';
 import { LoginGate } from './components/LoginGate';
+import { TradingViewChart } from './components/TradingViewChart';
 import { muscleGroups } from './data/muscleGroups';
 import { mockMachines } from './data/mockMachines';
 import type {
@@ -37,11 +38,12 @@ type DraftSet = {
   remainingSeconds: number;
 };
 
-type ActiveView = 'home' | 'planner' | 'record' | 'history' | 'oneRm' | 'activity';
+type ActiveView = 'home' | 'planner' | 'record' | 'history' | 'oneRm' | 'activity' | 'summary';
 type OneRmLift = 'squat' | 'benchPress' | 'deadlift' | 'overheadPress';
 type TrainingLevel = 'beginner' | 'intermediate' | 'advanced';
 type TrainingGoal = 'strength' | 'hypertrophy' | 'balanced';
 type SplitType = 'fullBody' | 'upperLower' | 'pushPullLegs' | 'bodyPart';
+type RecordVisualMode = 'body' | 'market';
 
 type RoutineDay = {
   dayLabel: string;
@@ -57,6 +59,10 @@ type ActiveWorkoutRecord = {
   machineName: string;
   muscleGroupLabel: string;
   setsCount: number;
+  sets: {
+    weightKg: string | number;
+    reps: number;
+  }[];
   workoutDate: string;
 };
 
@@ -96,6 +102,15 @@ const priorityGroupOptions: { value: MuscleGroup; label: string }[] = [
   { value: 'SHOULDERS', label: '어깨' },
   { value: 'ARMS', label: '팔' },
   { value: 'CORE', label: '복근' },
+];
+const marketSymbolOptions = [
+  { value: 'NASDAQ:INTC', label: '인텔' },
+  { value: 'NASDAQ:AMD', label: 'AMD' },
+  { value: 'NASDAQ:ARM', label: 'ARM' },
+  { value: 'NASDAQ:MU', label: '마이크론' },
+  { value: 'KRX:005930', label: '삼성전자' },
+  { value: 'KRX:000660', label: '하이닉스' },
+  { value: 'NASDAQ:SNDK', label: '샌디스크' },
 ];
 const weekLabels = ['월', '화', '수', '목', '금', '토', '일'];
 const splitTemplates: Record<SplitType, { title: string; groups: MuscleGroup[] }[]> = {
@@ -160,6 +175,44 @@ function formatDateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function formatWorkoutDateLabel(dateKey: string) {
+  const date = new Date(`${dateKey}T00:00:00`);
+  return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
+}
+
+function formatWorkoutSetSummary(sets: ActiveWorkoutRecord['sets']) {
+  if (sets.length === 0) {
+    return '세트 기록 없음';
+  }
+
+  return sets.map((set) => `${set.weightKg}kg x ${set.reps}회`).join(' / ');
+}
+
+function getSessionStats(session: WorkoutSession | null) {
+  if (!session) {
+    return {
+      exerciseCount: 0,
+      setCount: 0,
+      volume: 0,
+      parts: [] as string[],
+    };
+  }
+
+  const setCount = session.records.reduce((total, record) => total + record.sets.length, 0);
+  const volume = session.records.reduce(
+    (sessionTotal, record) =>
+      sessionTotal + record.sets.reduce((setTotal, set) => setTotal + Number(set.weightKg) * set.reps, 0),
+    0,
+  );
+
+  return {
+    exerciseCount: session.records.length,
+    setCount,
+    volume,
+    parts: Array.from(new Set(session.records.map((record) => record.muscleGroupLabel).filter(Boolean))),
+  };
+}
+
 function getPrescription(goal: TrainingGoal, level: TrainingLevel) {
   if (goal === 'strength') {
     return level === 'advanced' ? '5세트 x 3-5회' : '4세트 x 4-6회';
@@ -198,6 +251,15 @@ export function App() {
   const [activeWorkoutRecords, setActiveWorkoutRecords] = useState<ActiveWorkoutRecord[]>([]);
   const [exercisePickerOpen, setExercisePickerOpen] = useState(false);
   const [exerciseFormOpen, setExerciseFormOpen] = useState(false);
+  const [customExerciseOpen, setCustomExerciseOpen] = useState(false);
+  const [customExerciseName, setCustomExerciseName] = useState('');
+  const [customMovementPattern, setCustomMovementPattern] = useState('');
+  const [customExerciseDescription, setCustomExerciseDescription] = useState('');
+  const [customExerciseSaving, setCustomExerciseSaving] = useState(false);
+  const [summarySessionId, setSummarySessionId] = useState<string | null>(null);
+  const [selectedActivityDate, setSelectedActivityDate] = useState(today);
+  const [recordVisualMode, setRecordVisualMode] = useState<RecordVisualMode>('market');
+  const [marketSymbol, setMarketSymbol] = useState('NASDAQ:INTC');
   const [restDurationSeconds, setRestDurationSeconds] = useState(() => {
     const storedValue = Number(window.localStorage.getItem(restDurationKey));
     return storedValue >= minRestSeconds && storedValue <= maxRestSeconds
@@ -236,7 +298,7 @@ export function App() {
 
     let ignore = false;
 
-    api.listExercises()
+    api.listExercises(user.id)
       .then((exercises) => {
         if (!ignore && exercises.length > 0) {
           setExerciseMachines(exercises);
@@ -424,12 +486,33 @@ export function App() {
       machineName: record.machineName,
       muscleGroupLabel: record.muscleGroupLabel,
       setsCount: record.sets.length,
+      sets: record.sets.map((set) => ({
+        weightKg: set.weightKg,
+        reps: set.reps,
+      })),
       workoutDate: session.workoutDate,
     })),
   );
   const visibleWorkoutRecords = workoutStartedAt == null ? todaysWorkoutRecords : activeWorkoutRecords;
   const visibleWorkoutParts = Array.from(new Set(visibleWorkoutRecords.map((record) => record.muscleGroupLabel)));
   const visibleWorkoutSetCount = visibleWorkoutRecords.reduce((total, record) => total + record.setsCount, 0);
+  const summarySession =
+    sessions.find((session) => session.id === summarySessionId) ??
+    sessions.find((session) => session.status === 'FINISHED' && session.workoutDate === today) ??
+    null;
+  const summaryStats = getSessionStats(summarySession);
+  const selectedDateSessions = sessions.filter((session) => session.workoutDate === selectedActivityDate);
+  const selectedDateStats = selectedDateSessions.reduce(
+    (total, session) => {
+      const stats = getSessionStats(session);
+      return {
+        exerciseCount: total.exerciseCount + stats.exerciseCount,
+        setCount: total.setCount + stats.setCount,
+        volume: total.volume + stats.volume,
+      };
+    },
+    { exerciseCount: 0, setCount: 0, volume: 0 },
+  );
   const todaysExerciseNames = Array.from(
     new Set(todaysSessions.flatMap((session) => session.records.map((record) => record.machineName))),
   );
@@ -523,6 +606,10 @@ export function App() {
       machineName: record.machineName,
       muscleGroupLabel: record.muscleGroupLabel,
       setsCount: record.sets.length,
+      sets: record.sets.map((set) => ({
+        weightKg: set.weightKg,
+        reps: set.reps,
+      })),
       workoutDate: session.workoutDate,
     }));
   }
@@ -596,32 +683,47 @@ export function App() {
   }
 
   async function finishWorkout() {
+    let nextSummarySessionId = activeSessionId;
+
     if (user && activeSessionId && !isLocalSession(activeSessionId)) {
       try {
         const finishedSession = await api.finishWorkoutSession(user.id, activeSessionId);
         upsertSession(finishedSession);
+        nextSummarySessionId = finishedSession.id;
       } catch (error) {
         setError(error instanceof Error ? error.message : '운동 종료에 실패했습니다.');
+        return;
       }
     } else if (activeSessionId) {
+      const currentSession = sessions.find((session) => session.id === activeSessionId);
+      const finishedAt = new Date().toISOString();
+      const nextDurationSeconds = Math.max(1, workoutElapsedSeconds);
+      const finishedSession = currentSession
+        ? {
+            ...currentSession,
+            status: 'FINISHED' as const,
+            finishedAt,
+            durationSeconds: nextDurationSeconds,
+          }
+        : null;
+
       setSessions((current) =>
         current.map((session) =>
           session.id === activeSessionId
-            ? {
-                ...session,
-                status: 'FINISHED',
-                finishedAt: new Date().toISOString(),
-                durationSeconds: Math.max(1, workoutElapsedSeconds),
-              }
+            ? finishedSession ?? session
             : session,
         ),
       );
+      nextSummarySessionId = finishedSession?.id ?? activeSessionId;
     }
 
+    setSummarySessionId(nextSummarySessionId);
     setWorkoutStartedAt(null);
     setActiveSessionId(null);
     setExercisePickerOpen(false);
     setExerciseFormOpen(false);
+    setCustomExerciseOpen(false);
+    setActiveView('summary');
   }
 
   async function openExercisePicker() {
@@ -635,6 +737,59 @@ export function App() {
     setActiveView('record');
   }
 
+  function resetCustomExerciseForm() {
+    setCustomExerciseName('');
+    setCustomMovementPattern('');
+    setCustomExerciseDescription('');
+  }
+
+  async function submitCustomExercise(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!user || !customExerciseName.trim()) {
+      return;
+    }
+
+    setCustomExerciseSaving(true);
+    setError(null);
+
+    try {
+      const createdExercise = await api.createCustomExercise(user.id, {
+        name: customExerciseName,
+        muscleGroup: selectedGroup,
+        movementPattern: customMovementPattern,
+        description: customExerciseDescription,
+      });
+      setExerciseMachines((current) => [...current, createdExercise]);
+      setSelectedMachineId(createdExercise.id);
+      setExerciseFormOpen(true);
+      setCustomExerciseOpen(false);
+      resetCustomExerciseForm();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '커스텀 운동 등록에 실패했습니다.');
+    } finally {
+      setCustomExerciseSaving(false);
+    }
+  }
+
+  async function deleteCustomExercise(machine: ExerciseMachine) {
+    if (!user || !machine.deletable) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      await api.deleteCustomExercise(user.id, machine.id);
+      setExerciseMachines((current) => current.filter((exercise) => exercise.id !== machine.id));
+      if (selectedMachineId === machine.id) {
+        setSelectedMachineId(null);
+        setExerciseFormOpen(false);
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '커스텀 운동 삭제에 실패했습니다.');
+    }
+  }
+
   function logout() {
     window.localStorage.removeItem(mockSessionKey);
     window.localStorage.removeItem(legacyMockSessionKey);
@@ -644,6 +799,8 @@ export function App() {
     setActiveWorkoutRecords([]);
     setExercisePickerOpen(false);
     setExerciseFormOpen(false);
+    setCustomExerciseOpen(false);
+    setSummarySessionId(null);
     setSessions([]);
     setUser(null);
     setActiveView('home');
@@ -726,6 +883,10 @@ export function App() {
           machineName: localRecord.machineName,
           muscleGroupLabel: localRecord.muscleGroupLabel,
           setsCount: localRecord.sets.length,
+          sets: localRecord.sets.map((set) => ({
+            weightKg: set.weightKg,
+            reps: set.reps,
+          })),
           workoutDate,
         };
         setActiveWorkoutRecords((current) => [activeRecord, ...current]);
@@ -1058,7 +1219,38 @@ export function App() {
             </div>
 
             <section className={workoutStartedAt == null ? 'workout-log-stage' : 'workout-log-stage active'}>
-              <div className="muscle-visual-card" aria-label="오늘 운동 부위 비주얼" />
+              <div className="chart-control-dock">
+                <div className="visual-mode-tabs" aria-label="운동 카드 보기 방식">
+                  <button
+                    className={recordVisualMode === 'body' ? 'active' : ''}
+                    type="button"
+                    onClick={() => setRecordVisualMode('body')}
+                  >
+                    운동
+                  </button>
+                  <button
+                    className={recordVisualMode === 'market' ? 'active' : ''}
+                    type="button"
+                    onClick={() => setRecordVisualMode('market')}
+                  >
+                    차트
+                  </button>
+                </div>
+                <select value={marketSymbol} onChange={(event) => setMarketSymbol(event.target.value)}>
+                  {marketSymbolOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div
+                className={recordVisualMode === 'market' ? 'muscle-visual-card market-mode' : 'muscle-visual-card'}
+                aria-label={recordVisualMode === 'market' ? '운동 중 주식 차트' : '오늘 운동 부위 비주얼'}
+              >
+                {recordVisualMode === 'market' && <TradingViewChart symbol={marketSymbol} />}
+              </div>
 
               <div className="workout-log-list">
                 {visibleWorkoutRecords.length === 0 && (
@@ -1076,6 +1268,7 @@ export function App() {
                     <div>
                       <strong>{record.machineName}</strong>
                       <p>{record.muscleGroupLabel} · {record.setsCount}세트</p>
+                      <small>{formatWorkoutSetSummary(record.sets)}</small>
                     </div>
                     <button className="icon-button" type="button" aria-label={`${record.machineName} 옵션`}>
                       <span />
@@ -1149,30 +1342,95 @@ export function App() {
                       ))}
                     </div>
 
+                    <div className="custom-exercise-bar">
+                      <div>
+                        <strong>내 기구 등록</strong>
+                        <span>브랜드명이나 헬스장 전용 명칭까지 그대로 저장하세요.</span>
+                      </div>
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => setCustomExerciseOpen((current) => !current)}
+                      >
+                        <Plus size={16} />
+                        커스텀 추가
+                      </button>
+                    </div>
+
+                    {customExerciseOpen && (
+                      <form className="custom-exercise-form" onSubmit={submitCustomExercise}>
+                        <label>
+                          <span>운동/기구명</span>
+                          <input
+                            value={customExerciseName}
+                            onChange={(event) => setCustomExerciseName(event.target.value)}
+                            placeholder="예: 해머스트렝스 인클라인 프레스"
+                          />
+                        </label>
+                        <label>
+                          <span>패턴</span>
+                          <input
+                            value={customMovementPattern}
+                            onChange={(event) => setCustomMovementPattern(event.target.value)}
+                            placeholder="예: Machine Push"
+                          />
+                        </label>
+                        <label className="custom-description-field">
+                          <span>설명</span>
+                          <input
+                            value={customExerciseDescription}
+                            onChange={(event) => setCustomExerciseDescription(event.target.value)}
+                            placeholder="예: 우리 헬스장 오른쪽 라인 두 번째 기구"
+                          />
+                        </label>
+                        <button className="primary-button" type="submit" disabled={customExerciseSaving}>
+                          <Save size={16} />
+                          {customExerciseSaving ? '등록 중' : '등록'}
+                        </button>
+                      </form>
+                    )}
+
+                    {error && <p className="error-message">{error}</p>}
+
                     <div className="machine-card-grid compact">
                       {machines.map((machine) => (
-                        <button
+                        <article
                           className={selectedMachineId === machine.id ? 'machine-card selected' : 'machine-card'}
                           key={machine.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedMachineId(machine.id);
-                            setExerciseFormOpen(true);
-                          }}
                         >
-                          <div className="machine-card-top">
-                            <span className="machine-avatar">
-                              <Dumbbell size={18} />
-                            </span>
-                            <span className="status-dot" />
-                          </div>
-                          <strong>{machine.name}</strong>
-                          <p>{machine.description}</p>
-                          <div className="machine-tags">
-                            <span>#{machine.muscleGroupLabel}</span>
-                            <span>#{machine.movementPattern}</span>
-                          </div>
-                        </button>
+                          <button
+                            className="machine-card-select"
+                            type="button"
+                            onClick={() => {
+                              setSelectedMachineId(machine.id);
+                              setExerciseFormOpen(true);
+                            }}
+                          >
+                            <div className="machine-card-top">
+                              <span className="machine-avatar">
+                                <Dumbbell size={18} />
+                              </span>
+                              <span className="status-dot" />
+                            </div>
+                            <strong>{machine.name}</strong>
+                            <p>{machine.description}</p>
+                            <div className="machine-tags">
+                              <span>#{machine.muscleGroupLabel}</span>
+                              <span>#{machine.movementPattern}</span>
+                              {machine.custom && <span>#내기구</span>}
+                            </div>
+                          </button>
+                          {machine.deletable && (
+                            <button
+                              className="machine-delete-button"
+                              type="button"
+                              aria-label={`${machine.name} 삭제`}
+                              onClick={() => deleteCustomExercise(machine)}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </article>
                       ))}
                     </div>
                   </>
@@ -1328,6 +1586,16 @@ export function App() {
                       </p>
                     </div>
 
+                    <div className="insight-card insight-chart-card">
+                      <div className="panel-title">
+                        <Activity size={18} />
+                        <h3>운동 중 차트</h3>
+                      </div>
+                      <div className="compact-market-chart">
+                        <TradingViewChart symbol={marketSymbol} />
+                      </div>
+                    </div>
+
                     <div className="panel-title history-title">
                       <History size={18} />
                       <h3>이전 기록</h3>
@@ -1456,6 +1724,57 @@ export function App() {
           </section>
         )}
 
+        {activeView === 'summary' && summarySession && (
+          <section className="workout-summary-page">
+            <div className="section-heading">
+              <div>
+                <h2>운동 요약</h2>
+                <p>{formatWorkoutDateLabel(summarySession.workoutDate)} 기록을 한 페이지로 정리했습니다.</p>
+              </div>
+              <button className="link-button" type="button" onClick={() => setActiveView('activity')}>
+                내 활동에서 보기
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            <section className="summary-hero-card">
+              <div>
+                <span>{summarySession.status === 'FINISHED' ? 'Workout Complete' : 'Workout Draft'}</span>
+                <strong>{summaryStats.exerciseCount}개 운동 · {summaryStats.setCount}세트</strong>
+                <p>
+                  {summarySession.durationSeconds
+                    ? `${formatDuration(summarySession.durationSeconds)} 동안 기록했습니다.`
+                    : '운동 시간이 아직 종료 기록에 반영되지 않았습니다.'}
+                </p>
+              </div>
+              <div className="summary-volume">
+                <small>총 볼륨</small>
+                <strong>{Math.round(summaryStats.volume).toLocaleString()} kg</strong>
+              </div>
+            </section>
+
+            <div className="summary-part-row">
+              {summaryStats.parts.length === 0 && <span>기록된 부위 없음</span>}
+              {summaryStats.parts.map((part) => (
+                <span key={part}>{part}</span>
+              ))}
+            </div>
+
+            <div className="summary-record-list">
+              {summarySession.records.map((record) => (
+                <article className="summary-record-card" key={record.id}>
+                  <div>
+                    <strong>{record.machineName}</strong>
+                    <span>{record.muscleGroupLabel} · {record.sets.length}세트</span>
+                  </div>
+                  <p>{record.sets.map((set) => `${set.weightKg}kg x ${set.reps}`).join(' / ')}</p>
+                  {record.note && <small>{record.note}</small>}
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
         {activeView === 'activity' && (
         <section className="session-section">
           <div className="section-heading">
@@ -1492,15 +1811,20 @@ export function App() {
               </div>
               <div className="calendar-grid">
                 {calendarCells.map((cell, index) => (
-                  <div
+                  <button
+                    type="button"
                     className={
                       cell == null
                         ? 'calendar-day empty-day'
                         : calendarTrainedDateSet.has(cell.dateKey)
-                          ? 'calendar-day trained'
+                          ? selectedActivityDate === cell.dateKey
+                            ? 'calendar-day trained selected'
+                            : 'calendar-day trained'
                           : 'calendar-day'
                     }
                     key={cell?.dateKey ?? `blank-${index}`}
+                    onClick={() => cell && setSelectedActivityDate(cell.dateKey)}
+                    disabled={cell == null}
                   >
                     {cell && (
                       <>
@@ -1508,10 +1832,45 @@ export function App() {
                         {calendarTrainedDateSet.has(cell.dateKey) && <small />}
                       </>
                     )}
-                  </div>
+                  </button>
                 ))}
               </div>
             </article>
+          </section>
+
+          <section className="activity-date-detail">
+            <div className="activity-date-head">
+              <div>
+                <span>선택 날짜</span>
+                <strong>{formatWorkoutDateLabel(selectedActivityDate)}</strong>
+              </div>
+              <p>
+                {selectedDateStats.exerciseCount}개 운동 · {selectedDateStats.setCount}세트 ·{' '}
+                {Math.round(selectedDateStats.volume).toLocaleString()}kg
+              </p>
+            </div>
+            {selectedDateSessions.length === 0 && <p className="empty">이 날짜에는 저장된 운동이 없습니다.</p>}
+            {selectedDateSessions.map((session) => {
+              const stats = getSessionStats(session);
+              return (
+                <button
+                  className="activity-session-detail"
+                  key={session.id}
+                  type="button"
+                  onClick={() => {
+                    setSummarySessionId(session.id);
+                    setActiveView('summary');
+                  }}
+                >
+                  <div>
+                    <strong>{stats.exerciseCount}개 운동</strong>
+                    <span>{stats.parts.join(', ') || '부위 기록 없음'}</span>
+                  </div>
+                  <p>{stats.setCount}세트 · {Math.round(stats.volume).toLocaleString()}kg</p>
+                  <ChevronRight size={16} />
+                </button>
+              );
+            })}
           </section>
 
           <div className="session-gallery">
@@ -1523,7 +1882,15 @@ export function App() {
               </article>
             )}
             {sessions.slice(0, 6).map((session) => (
-              <article className="session-tile" key={session.id}>
+              <button
+                className="session-tile"
+                key={session.id}
+                type="button"
+                onClick={() => {
+                  setSummarySessionId(session.id);
+                  setActiveView('summary');
+                }}
+              >
                 <div className="tile-overlay">
                   <span>{session.workoutDate}</span>
                   <strong>{session.records.map((record) => record.machineName).join(', ')}</strong>
@@ -1532,7 +1899,7 @@ export function App() {
                     {session.records.map((record) => record.muscleGroupLabel).join(', ')}
                   </small>
                 </div>
-              </article>
+              </button>
             ))}
           </div>
         </section>

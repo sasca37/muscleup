@@ -1,5 +1,6 @@
 import type {
   AddWorkoutRecordPayload,
+  CreateCustomExercisePayload,
   ExerciseMachine,
   LoginPayload,
   MuscleGroup,
@@ -9,7 +10,7 @@ import type {
   WorkoutSession,
 } from '../types/domain';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'https://muscleup-07kt.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 export const APP_BASE_URL = import.meta.env.VITE_APP_BASE_URL ?? window.location.origin;
 
 type ApiErrorResponse = {
@@ -38,7 +39,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(message);
   }
 
-  return response.json() as Promise<T>;
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 function withUser(userId: string, options?: RequestInit): RequestInit {
@@ -52,9 +58,20 @@ function withUser(userId: string, options?: RequestInit): RequestInit {
 }
 
 export const api = {
-  listExercises(muscleGroup?: MuscleGroup) {
+  listExercises(userId?: string, muscleGroup?: MuscleGroup) {
     const query = muscleGroup ? `?muscleGroup=${encodeURIComponent(muscleGroup)}` : '';
-    return request<ExerciseMachine[]>(`/api/exercises${query}`);
+    return request<ExerciseMachine[]>(`/api/exercises${query}`, userId ? withUser(userId) : undefined);
+  },
+  createCustomExercise(userId: string, payload: CreateCustomExercisePayload) {
+    return request<ExerciseMachine>('/api/exercises/custom', withUser(userId, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }));
+  },
+  deleteCustomExercise(userId: string, catalogId: number) {
+    return request<void>(`/api/exercises/${catalogId}`, withUser(userId, {
+      method: 'DELETE',
+    }));
   },
   login(payload: LoginPayload) {
     return request<User>('/api/users/login', {
