@@ -14,4 +14,6 @@ public interface ExerciseRepository extends MongoRepository<Exercise, String> {
     List<Exercise> findByMuscleGroupAndActiveTrueOrderByCatalogIdAsc(MuscleGroup muscleGroup);
 
     Optional<Exercise> findByCatalogIdAndActiveTrue(int catalogId);
+
+    Optional<Exercise> findFirstByOrderByCatalogIdDesc();
 }

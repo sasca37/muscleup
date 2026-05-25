@@ -89,6 +89,9 @@ public class WorkoutSessionService {
 
         Exercise exercise = exerciseRepository.findByCatalogIdAndActiveTrue(catalogId)
             .orElseThrow(() -> new InvalidWorkoutSessionRequestException("운동 종목을 찾을 수 없습니다."));
+        if (!exercise.isVisibleTo(userId)) {
+            throw new InvalidWorkoutSessionRequestException("운동 종목을 찾을 수 없습니다.");
+        }
         WorkoutSession session = findSessionForUser(sessionId, userId);
         List<WorkoutSet> sets = createSets(setInputs);
 
