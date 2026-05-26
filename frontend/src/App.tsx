@@ -70,6 +70,11 @@ type ActiveWorkoutRecord = {
   workoutDate: string;
 };
 
+type AppRoute = {
+  view: ActiveView;
+  summarySessionId: string | null;
+};
+
 const today = new Date().toISOString().slice(0, 10);
 const mockSessionKey = 'repick-mock-session';
 const legacyMockSessionKey = 'muscle-log-mock-session';
@@ -132,6 +137,60 @@ const splitTemplates: Record<SplitType, { title: string; groups: MuscleGroup[] }
     { title: '코어 보강', groups: ['CORE', 'BACK'] },
   ],
 };
+
+function parseAppRoute(): AppRoute {
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  const summaryMatch = path.match(/^\/summary\/([^/]+)$/);
+
+  if (summaryMatch) {
+    return {
+      view: 'summary',
+      summarySessionId: decodeURIComponent(summaryMatch[1]),
+    };
+  }
+
+  if (path === '/planner') {
+    return { view: 'planner', summarySessionId: null };
+  }
+
+  if (path === '/record') {
+    return { view: 'record', summarySessionId: null };
+  }
+
+  if (path === '/one-rm') {
+    return { view: 'oneRm', summarySessionId: null };
+  }
+
+  if (path === '/activity') {
+    return { view: 'activity', summarySessionId: null };
+  }
+
+  return { view: 'home', summarySessionId: null };
+}
+
+function getAppRoutePath(view: ActiveView, summarySessionId?: string | null) {
+  if (view === 'planner') {
+    return '/planner';
+  }
+
+  if (view === 'record') {
+    return '/record';
+  }
+
+  if (view === 'oneRm') {
+    return '/one-rm';
+  }
+
+  if (view === 'activity') {
+    return '/activity';
+  }
+
+  if (view === 'summary' && summarySessionId) {
+    return `/summary/${encodeURIComponent(summarySessionId)}`;
+  }
+
+  return '/';
+}
 
 function createDraftSet(): DraftSet {
   return {
@@ -433,9 +492,10 @@ function getPrescription(goal: TrainingGoal, level: TrainingLevel) {
 }
 
 export function App() {
+  const initialRoute = useMemo(parseAppRoute, []);
   const [user, setUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [activeView, setActiveView] = useState<ActiveView>('home');
+  const [activeView, setActiveView] = useState<ActiveView>(initialRoute.view);
   const [exerciseMachines, setExerciseMachines] = useState<ExerciseMachine[]>(mockMachines);
   const [selectedGroup, setSelectedGroup] = useState<MuscleGroup>('CHEST');
   const [selectedMachineId, setSelectedMachineId] = useState<number | null>(null);
@@ -463,7 +523,7 @@ export function App() {
   const [customMovementPattern, setCustomMovementPattern] = useState('');
   const [customExerciseDescription, setCustomExerciseDescription] = useState('');
   const [customExerciseSaving, setCustomExerciseSaving] = useState(false);
-  const [summarySessionId, setSummarySessionId] = useState<string | null>(null);
+  const [summarySessionId, setSummarySessionId] = useState<string | null>(initialRoute.summarySessionId);
   const [selectedActivityDate, setSelectedActivityDate] = useState(today);
   const [recordVisualMode, setRecordVisualMode] = useState<RecordVisualMode>('market');
   const [favoriteMachineIds, setFavoriteMachineIds] = useState<Set<number>>(() => new Set());
@@ -481,6 +541,16 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  function navigateToView(view: ActiveView, nextSummarySessionId: string | null = null) {
+    setActiveView(view);
+    setSummarySessionId(view === 'summary' ? nextSummarySessionId : null);
+
+    const nextPath = getAppRoutePath(view, nextSummarySessionId);
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({ view, summarySessionId: nextSummarySessionId }, '', nextPath);
+    }
+  }
+
   useEffect(() => {
     const storedUser =
       window.localStorage.getItem(mockSessionKey) ?? window.localStorage.getItem(legacyMockSessionKey);
@@ -496,6 +566,17 @@ export function App() {
       }
     }
     setAuthChecked(true);
+  }, []);
+
+  useEffect(() => {
+    function handlePopState() {
+      const route = parseAppRoute();
+      setActiveView(route.view);
+      setSummarySessionId(route.summarySessionId);
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   useEffect(() => {
@@ -934,7 +1015,7 @@ export function App() {
     await ensureWorkoutSessionStarted();
     setExercisePickerOpen(false);
     setExerciseFormOpen(false);
-    setActiveView('record');
+    navigateToView('record');
   }
 
   async function finishWorkout() {
@@ -948,7 +1029,7 @@ export function App() {
       setError('운동을 1개 이상 추가한 뒤 종료할 수 있습니다.');
       setExercisePickerOpen(true);
       setExerciseFormOpen(false);
-      setActiveView('record');
+      navigateToView('record');
       return;
     }
 
@@ -984,20 +1065,19 @@ export function App() {
       nextSummarySessionId = finishedSession?.id ?? activeSessionId;
     }
 
-    setSummarySessionId(nextSummarySessionId);
     setWorkoutStartedAt(null);
     setActiveSessionId(null);
     setExercisePickerOpen(false);
     setExerciseFormOpen(false);
     setCustomExerciseOpen(false);
-    setActiveView('summary');
+    navigateToView('summary', nextSummarySessionId);
   }
 
   async function openExercisePicker() {
     setSelectedMachineId(null);
     setExerciseFormOpen(false);
     setExercisePickerOpen(true);
-    setActiveView('record');
+    navigateToView('record');
   }
 
   function closeExercisePickerStep() {
@@ -1160,8 +1240,7 @@ export function App() {
       setActiveWorkoutRecords([]);
     }
     if (summarySessionId === sessionId) {
-      setSummarySessionId(null);
-      setActiveView('activity');
+      navigateToView('activity');
     }
   }
 
@@ -1306,7 +1385,7 @@ export function App() {
     setSessions([]);
     setFavoriteMachineIds(new Set());
     setUser(null);
-    setActiveView('home');
+    navigateToView('home');
   }
 
   async function submitWorkout(event: FormEvent<HTMLFormElement>) {
@@ -1409,23 +1488,23 @@ export function App() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <button className="brand-wordmark brand-home-button" type="button" onClick={() => setActiveView('home')}>
+        <button className="brand-wordmark brand-home-button" type="button" onClick={() => navigateToView('home')}>
           Repick
         </button>
         <nav className="main-nav" aria-label="주요 메뉴">
-          <button className={activeView === 'home' ? 'active' : ''} type="button" onClick={() => setActiveView('home')}>
+          <button className={activeView === 'home' ? 'active' : ''} type="button" onClick={() => navigateToView('home')}>
             홈
           </button>
-          <button className={activeView === 'planner' ? 'active' : ''} type="button" onClick={() => setActiveView('planner')}>
+          <button className={activeView === 'planner' ? 'active' : ''} type="button" onClick={() => navigateToView('planner')}>
             루틴설계
           </button>
-          <button className={activeView === 'record' ? 'active' : ''} type="button" onClick={() => setActiveView('record')}>
+          <button className={activeView === 'record' ? 'active' : ''} type="button" onClick={() => navigateToView('record')}>
             운동기록
           </button>
-          <button className={activeView === 'oneRm' ? 'active' : ''} type="button" onClick={() => setActiveView('oneRm')}>
+          <button className={activeView === 'oneRm' ? 'active' : ''} type="button" onClick={() => navigateToView('oneRm')}>
             1RM
           </button>
-          <button className={activeView === 'activity' ? 'active' : ''} type="button" onClick={() => setActiveView('activity')}>
+          <button className={activeView === 'activity' ? 'active' : ''} type="button" onClick={() => navigateToView('activity')}>
             내 활동
           </button>
         </nav>
@@ -1447,7 +1526,7 @@ export function App() {
             <br />
             기구별로 남겨볼까요?
           </h1>
-          <button type="button" onClick={() => setActiveView('record')}>
+          <button type="button" onClick={() => navigateToView('record')}>
             {workoutStartedAt == null ? '운동 기록 열기' : '운동 이어가기'}
           </button>
         </div>
@@ -1461,7 +1540,7 @@ export function App() {
                 <h2>오늘의 Repick</h2>
                 <p>기록, 휴식 타이머, 이전 수행 기록을 한 흐름으로 관리합니다.</p>
               </div>
-              <button className="link-button" type="button" onClick={() => setActiveView('record')}>
+              <button className="link-button" type="button" onClick={() => navigateToView('record')}>
                 {workoutStartedAt == null ? '운동 기록 열기' : '운동 이어가기'}
                 <ChevronRight size={16} />
               </button>
@@ -1479,7 +1558,7 @@ export function App() {
               </div>
               <div className="workout-status-actions">
                 {workoutStartedAt == null ? (
-                  <button className="primary-button" type="button" onClick={() => setActiveView('record')}>
+                  <button className="primary-button" type="button" onClick={() => navigateToView('record')}>
                     <Timer size={16} />
                     운동 기록 열기
                   </button>
@@ -1529,15 +1608,15 @@ export function App() {
                 <strong>새 운동 기록</strong>
                 <span>기구를 고르고 세트별 무게/횟수를 입력합니다.</span>
               </button>
-              <button type="button" onClick={() => setActiveView('planner')}>
+              <button type="button" onClick={() => navigateToView('planner')}>
                 <strong>AI 루틴 설계</strong>
                 <span>프로필과 분할 방식을 고르면 주간 플랜 초안을 만듭니다.</span>
               </button>
-              <button type="button" onClick={() => setActiveView('oneRm')}>
+              <button type="button" onClick={() => navigateToView('oneRm')}>
                 <strong>1RM 계산기</strong>
                 <span>주요 리프트의 예상 최대 중량을 빠르게 계산합니다.</span>
               </button>
-              <button type="button" onClick={() => setActiveView('activity')}>
+              <button type="button" onClick={() => navigateToView('activity')}>
                 <strong>내 활동 보기</strong>
                 <span>저장된 세션을 카드 형태로 훑어봅니다.</span>
               </button>
@@ -1552,7 +1631,7 @@ export function App() {
                 <h2>AI 루틴 설계</h2>
                 <p>프로필, 목표, 분할 방식을 고르면 Repick 운동 카탈로그 기반 주간 플랜 초안을 만듭니다.</p>
               </div>
-              <button className="link-button" type="button" onClick={() => setActiveView('record')}>
+              <button className="link-button" type="button" onClick={() => navigateToView('record')}>
                 이 루틴으로 기록하기
                 <ChevronRight size={16} />
               </button>
@@ -2175,7 +2254,7 @@ export function App() {
                 <h2>1RM 계산기</h2>
                 <p>Epley Formula로 스쿼트, 벤치프레스, 데드리프트, 오버헤드프레스의 예상 1RM을 계산합니다.</p>
               </div>
-              <button className="link-button" type="button" onClick={() => setActiveView('record')}>
+              <button className="link-button" type="button" onClick={() => navigateToView('record')}>
                 운동 기록하기
                 <ChevronRight size={16} />
               </button>
@@ -2249,7 +2328,7 @@ export function App() {
                 <h2>운동 완료</h2>
                 <p>{formatWorkoutDateLabel(summarySession.workoutDate)} 하루 운동을 멋지게 끝냈습니다.</p>
               </div>
-              <button className="link-button" type="button" onClick={() => setActiveView('activity')}>
+              <button className="link-button" type="button" onClick={() => navigateToView('activity')}>
                 내 활동에서 보기
                 <ChevronRight size={16} />
               </button>
@@ -2504,8 +2583,7 @@ export function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        setSummarySessionId(session.id);
-                        setActiveView('summary');
+                        navigateToView('summary', session.id);
                       }}
                     >
                       상세
@@ -2539,8 +2617,7 @@ export function App() {
                 key={session.id}
                 type="button"
                 onClick={() => {
-                  setSummarySessionId(session.id);
-                  setActiveView('summary');
+                  navigateToView('summary', session.id);
                 }}
               >
                 <div className="tile-overlay">
