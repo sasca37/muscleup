@@ -119,9 +119,14 @@ export type MarketQuote = {
   name: string;
   exchangeCode: string;
   last: string;
+  base: string | null;
   price: number | null;
   diff: string | null;
   rate: string | null;
   volume: string | null;
   fetchedAt: string;
+};
+
+export type MarketWatchlist = {
+  symbols: string[];
 };

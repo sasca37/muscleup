@@ -4,6 +4,7 @@ import type {
   ExerciseMachine,
   LoginPayload,
   MarketQuote,
+  MarketWatchlist,
   MuscleGroup,
   RegisterPayload,
   StartWorkoutSessionPayload,
@@ -122,5 +123,17 @@ export const api = {
   },
   getUsStockQuote(symbol: string) {
     return request<MarketQuote>(`/api/market/us-stocks/${encodeURIComponent(symbol)}`);
+  },
+  getMarketWatchlist(userId: string) {
+    return request<MarketWatchlist>('/api/market/watchlist', withUser(userId));
+  },
+  updateMarketWatchlist(userId: string, symbols: string[]) {
+    return request<MarketWatchlist>('/api/market/watchlist', withUser(userId, {
+      method: 'PUT',
+      body: JSON.stringify({ symbols }),
+    }));
+  },
+  getMarketWatchlistQuotes(userId: string) {
+    return request<MarketQuote[]>('/api/market/watchlist/quotes', withUser(userId));
   },
 };

@@ -51,6 +51,7 @@ frontend/  React + Vite 앱
 com.healthtracker.api.common   공통 에러 응답과 예외 처리
 com.healthtracker.api.config   Web/CORS 설정
 com.healthtracker.api.exercise MongoDB 기반 운동 카탈로그 도메인
+com.healthtracker.api.market   한국투자증권 KIS 미국주식 현재가 조회 프록시
 com.healthtracker.api.mongo    임시 MongoDB 연결 테스트 API
 com.healthtracker.api.user     MongoDB 기반 유저 로그인 도메인
 com.healthtracker.api.workout  MongoDB 기반 운동 세션/기록 도메인
@@ -146,7 +147,6 @@ mongo_connection_tests
 - 홈 대시보드
 - 루틴 설계
 - 운동 기록
-- 히스토리
 - 1RM 계산기
 - 내 활동/캘린더
 
@@ -178,6 +178,93 @@ mongo_connection_tests
 - 운동 기록 추가는 `POST /api/workout-sessions/{sessionId}/records`이다.
 - 운동 종료는 `PATCH /api/workout-sessions/{sessionId}/finish`이다.
 - 기구별 이전 기록 조회는 `GET /api/exercises/{catalogId}/history`이다.
+- 운동 기록 삭제는 `DELETE /api/workout-sessions/{sessionId}/records/{recordId}`이다.
+- 운동 세션 삭제는 `DELETE /api/workout-sessions/{sessionId}`이다.
+
+## 주식 현재가 기능
+
+TradingView 위젯은 제거했고, 한국투자증권 KIS REST API 기반 현재가 카드로 대체했다.
+
+백엔드 구조:
+
+- `backend/src/main/java/com/healthtracker/api/market/api/MarketQuoteController.java`
+- `backend/src/main/java/com/healthtracker/api/market/service/MarketQuoteService.java`
+- `backend/src/main/java/com/healthtracker/api/market/service/KisAccessTokenProvider.java`
+- `backend/src/main/java/com/healthtracker/api/market/config/KisProperties.java`
+
+프론트 구조:
+
+- `frontend/src/components/MarketQuotePanel.tsx`
+- `frontend/src/components/TradingViewChart.tsx`는 삭제됨.
+
+현재 API:
+
+```text
+GET /api/market/us-stocks/{symbol}
+```
+
+현재 지원 종목:
+
+```text
+INTC, AMD, ARM, MU, SNDK
+```
+
+동작:
+
+- KIS OAuth token은 DB나 파일이 아니라 Spring Boot 서버 메모리에만 캐싱한다.
+- `KisAccessTokenProvider`의 `cachedAccessToken` 필드에 저장한다.
+- 토큰이 없거나 만료 5분 전이면 `/oauth2/tokenP`로 재발급한다.
+- 서버 재시작/Render sleep 이후에는 다음 조회 때 새로 발급한다.
+- KIS 현재가 응답 중 `output.last` 값을 현재가로 사용한다.
+- 프론트는 현재가 카드를 5초 간격으로 갱신한다.
+
+필요 환경변수:
+
+```bash
+KIS_BASE_URL=https://openapi.koreainvestment.com:9443
+KIS_APP_KEY=...
+KIS_APP_SECRET=...
+KIS_PRICE_DETAIL_TR_ID=HHDFS76200200
+```
+
+주의:
+
+- `KIS_APP_KEY`, `KIS_APP_SECRET`은 절대 GitHub에 커밋하지 않는다.
+- 실제 값은 `backend/.env` 또는 Render Environment Variables에만 둔다.
+- `backend/.env.example`에는 placeholder만 둔다.
+- `application.yml`은 `optional:file:.env[.properties]`로 로컬 `.env`를 읽는다.
+- 삼성전자/하이닉스는 아직 빠져 있다. 국내주식 API를 별도로 붙여야 한다.
+
+## 운동 이미지 에셋
+
+기구별 이미지 에셋은 `frontend/public/exercises/`에 저장한다.
+
+현재 해부학 스타일 대표 에셋을 생성해 운동명 기반으로 매핑했다.
+
+대표 파일 예:
+
+```text
+bench-press-anatomy.png
+incline-press-anatomy.png
+chest-fly-anatomy.png
+lat-pulldown-anatomy.png
+seated-row-anatomy.png
+leg-press-anatomy.png
+squat-anatomy.png
+leg-extension-anatomy.png
+leg-curl-anatomy.png
+deadlift-anatomy.png
+shoulder-press-anatomy.png
+lateral-raise-anatomy.png
+rear-delt-fly-anatomy.png
+triceps-pushdown-anatomy.png
+biceps-curl-anatomy.png
+cable-crunch-anatomy.png
+plank-anatomy.png
+```
+
+매핑 함수는 `frontend/src/App.tsx`의 `getExerciseAssetUrl(name)`이다.
+새 운동 이미지를 추가하면 이 함수의 keyword rule도 같이 갱신한다.
 
 ## 디자인 기준
 
@@ -253,9 +340,66 @@ VITE_APP_BASE_URL=http://localhost:5173
 
 ## 현재 주의사항
 
-- `README.md`에는 예전 OAuth/JPA 기반 설명이 일부 남아 있으므로 이후 갱신이 필요하다.
+- `README.md`에는 예전 OAuth/JPA 기반 설명이 일부 남아 있을 수 있으므로 이후 갱신이 필요하다.
 - 운동 기록은 백엔드 세션 API와 연결되었고, 백엔드 호출 실패 시 로컬 fallback으로 동작한다.
 - 운동 카탈로그 API는 백엔드와 프론트 연결이 완료되었고, 실패 시 프론트 목업 fallback을 사용한다.
 - 프론트의 운동 시작, 운동 추가, 운동 종료 흐름은 운동 세션 API와 연결되었다.
 - 백엔드 호출이 실패하면 운동 화면은 로컬 세션 fallback으로 계속 동작한다.
+
+## 다음 세션 인수인계 메모
+
+마지막 작업은 사용자가 요청한 아래 3개 기능을 한 번에 진행하다가 중단했다.
+
+```text
+1. 최근 사용 기구 / 즐겨찾기
+2. 이전 세트 자동 불러오기
+4. 세트별 이전 기록 비교
+```
+
+현재 코드에는 위 기능의 프론트 일부가 이미 들어가 있다. 다음 세션에서는 먼저 현재 변경사항을 검토하고, 빌드가 깨지지 않는지 확인한 뒤 차례대로 정리하는 것이 좋다.
+
+부분 적용된 내용:
+
+- `frontend/src/App.tsx`
+  - `Star` 아이콘 import 추가
+  - `favoriteExercisesKeyPrefix` 추가
+  - `favoriteMachineIds` state 추가
+  - 사용자별 즐겨찾기를 localStorage에서 읽는 로직 추가
+  - `favoriteMachines`, `recentMachines`, `quickPickMachines` 계산 로직 추가
+  - `selectMachineForRecord(machine)` 함수 추가
+  - `toggleFavoriteMachine(machineId)` 함수 추가
+  - 운동 선택 모달에 `바로 선택` 빠른 선택 UI 일부 추가
+  - 기구 카드에 즐겨찾기 버튼 일부 추가
+  - 세트 입력 행에 `previous-set-hint` 일부 추가
+  - `createDraftSetFromHistory`, `formatPreviousSet` helper 추가
+- `frontend/src/styles.css`
+  - `.quick-machine-section`, `.quick-machine-list`, `.quick-machine-pill` 등 스타일 추가
+  - `.favorite-machine-button` 스타일 추가
+  - `.previous-set-hint` 스타일 추가
+
+아직 확인/정리가 필요한 부분:
+
+- `npm --prefix frontend run build`를 반드시 다시 실행한다.
+- 위 변경은 직전에 사용자가 중단했기 때문에 빌드 성공 여부가 아직 확정되지 않았다.
+- `selectedMachine` 조회를 부위 필터된 `machines`가 아니라 전체 `exerciseMachines`에서 찾도록 바꿨다. 이 변경은 빠른 선택에서 다른 부위 기구를 바로 선택하기 위해 필요하다.
+- `findMachineHistory(machine.id)`는 현재 로드된 `sessions`만 사용한다. 백엔드의 `GET /api/exercises/{catalogId}/history` API를 직접 호출하는 구조는 아직 아니다.
+- 즐겨찾기는 아직 백엔드 저장이 아니라 사용자별 localStorage 저장이다.
+- 빠른 선택 UI/즐겨찾기 UI가 모바일에서 충분히 예쁜지 확인이 필요하다.
+- 이전 세트 자동 불러오기는 `selectMachineForRecord`에서 최근 기록의 세트를 입력칸에 복사하는 방식으로 부분 구현되어 있다.
+- 세트별 이전 기록 비교는 각 세트 행 아래 `지난 00kg x 00회` 힌트로 부분 구현되어 있다.
+
+권장 이어서 작업 순서:
+
+1. 현재 변경분 기준으로 `npm --prefix frontend run build` 실행.
+2. 빌드 오류가 있으면 먼저 수정.
+3. 1번 기능만 마무리: 최근 사용 기구/즐겨찾기 UI가 운동 추가 모달에서 잘 보이는지 정리.
+4. 2번 기능만 마무리: 기구 선택 시 지난 세트가 자동 입력되는지 확인.
+5. 4번 기능만 마무리: 세트별 이전 기록 힌트 UI를 다듬고, 기록이 없을 때는 표시하지 않기.
+6. 필요하면 이후 즐겨찾기 저장을 백엔드로 올릴지 결정.
+
+마지막 검증 상황:
+
+- KIS 현재가 기능 추가 이후 `npm --prefix frontend run build` 성공.
+- KIS 현재가 기능 추가 이후 `cd backend && ./gradlew test` 성공.
+- 그 뒤 1/2/4번 부분 작업은 아직 최종 검증 전이다.
 - 소셜 로그인과 이메일 인증은 추후 기능이다.

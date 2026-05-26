@@ -11,6 +11,7 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Star,
   Timer,
   Trophy,
   Trash2,
@@ -28,6 +29,7 @@ import type {
   MuscleGroup,
   User,
   WorkoutSession,
+  WorkoutSet,
 } from './types/domain';
 
 type DraftSet = {
@@ -71,6 +73,7 @@ const today = new Date().toISOString().slice(0, 10);
 const mockSessionKey = 'repick-mock-session';
 const legacyMockSessionKey = 'muscle-log-mock-session';
 const restDurationKey = 'repick-rest-duration';
+const favoriteExercisesKeyPrefix = 'repick-favorite-exercises';
 const defaultRestSeconds = 60;
 const minRestSeconds = 10;
 const maxRestSeconds = 300;
@@ -103,13 +106,6 @@ const priorityGroupOptions: { value: MuscleGroup; label: string }[] = [
   { value: 'SHOULDERS', label: '어깨' },
   { value: 'ARMS', label: '팔' },
   { value: 'CORE', label: '복근' },
-];
-const marketSymbolOptions = [
-  { value: 'INTC', label: '인텔' },
-  { value: 'AMD', label: 'AMD' },
-  { value: 'ARM', label: 'ARM' },
-  { value: 'MU', label: '마이크론' },
-  { value: 'SNDK', label: '샌디스크' },
 ];
 const weekLabels = ['월', '화', '수', '목', '금', '토', '일'];
 const splitTemplates: Record<SplitType, { title: string; groups: MuscleGroup[] }[]> = {
@@ -144,6 +140,44 @@ function createDraftSet(): DraftSet {
     completed: false,
     remainingSeconds: 0,
   };
+}
+
+function createDraftSetFromHistory(set?: WorkoutSet): DraftSet {
+  return {
+    ...createDraftSet(),
+    weightKg: set?.weightKg == null ? '' : String(set.weightKg),
+    reps: set?.reps == null ? '' : String(set.reps),
+  };
+}
+
+function formatPreviousSet(set?: WorkoutSet, draftSet?: DraftSet) {
+  if (!set) {
+    return null;
+  }
+
+  const previousWeight = Number(set.weightKg);
+  const currentWeight = Number(draftSet?.weightKg);
+  const currentReps = Number(draftSet?.reps);
+  const changes: string[] = [];
+
+  if (Number.isFinite(previousWeight) && Number.isFinite(currentWeight) && draftSet?.weightKg !== '') {
+    const weightDiff = currentWeight - previousWeight;
+    if (weightDiff !== 0) {
+      changes.push(`${weightDiff > 0 ? '+' : ''}${weightDiff}kg`);
+    }
+  }
+
+  if (Number.isFinite(currentReps) && draftSet?.reps !== '') {
+    const repsDiff = currentReps - set.reps;
+    if (repsDiff !== 0) {
+      changes.push(`${repsDiff > 0 ? '+' : ''}${repsDiff}회`);
+    }
+  }
+
+  const comparison = changes.length > 0 ? changes.join(' / ') : draftSet?.weightKg || draftSet?.reps ? '지난과 동일' : null;
+  return comparison
+    ? `지난 ${set.weightKg}kg x ${set.reps}회 · ${comparison}`
+    : `지난 ${set.weightKg}kg x ${set.reps}회`;
 }
 
 function formatSeconds(seconds: number) {
@@ -351,7 +385,7 @@ export function App() {
   const [summarySessionId, setSummarySessionId] = useState<string | null>(null);
   const [selectedActivityDate, setSelectedActivityDate] = useState(today);
   const [recordVisualMode, setRecordVisualMode] = useState<RecordVisualMode>('market');
-  const [marketSymbol, setMarketSymbol] = useState('INTC');
+  const [favoriteMachineIds, setFavoriteMachineIds] = useState<Set<number>>(() => new Set());
   const [restDurationSeconds, setRestDurationSeconds] = useState(() => {
     const storedValue = Number(window.localStorage.getItem(restDurationKey));
     return storedValue >= minRestSeconds && storedValue <= maxRestSeconds
@@ -386,6 +420,17 @@ export function App() {
   useEffect(() => {
     if (!user) {
       return;
+    }
+
+    const storedFavorites = window.localStorage.getItem(`${favoriteExercisesKeyPrefix}:${user.id}`);
+    if (storedFavorites) {
+      try {
+        setFavoriteMachineIds(new Set((JSON.parse(storedFavorites) as number[]).filter(Number.isFinite)));
+      } catch {
+        setFavoriteMachineIds(new Set());
+      }
+    } else {
+      setFavoriteMachineIds(new Set());
     }
 
     let ignore = false;
@@ -450,12 +495,12 @@ export function App() {
 
   useEffect(() => {
     setSelectedMachineId((current) => {
-      if (current != null && machines.some((machine) => machine.id === current)) {
+      if (current != null && exerciseMachines.some((machine) => machine.id === current)) {
         return current;
       }
       return null;
-      });
-  }, [machines]);
+    });
+  }, [exerciseMachines]);
 
   useEffect(() => {
     const hasRunningTimer = sets.some((set) => set.completed && set.remainingSeconds > 0);
@@ -491,8 +536,8 @@ export function App() {
   }, [workoutStartedAt]);
 
   const selectedMachine = useMemo(
-    () => machines.find((machine) => machine.id === selectedMachineId) ?? null,
-    [machines, selectedMachineId],
+    () => exerciseMachines.find((machine) => machine.id === selectedMachineId) ?? null,
+    [exerciseMachines, selectedMachineId],
   );
 
   const history: MachineHistory[] = useMemo(() => {
@@ -579,6 +624,29 @@ export function App() {
   const visibleWorkoutRecords = workoutStartedAt == null ? todaysWorkoutRecords : activeWorkoutRecords;
   const visibleWorkoutParts = Array.from(new Set(visibleWorkoutRecords.map((record) => record.muscleGroupLabel)));
   const visibleWorkoutSetCount = visibleWorkoutRecords.reduce((total, record) => total + record.setsCount, 0);
+  const favoriteMachines = exerciseMachines.filter((machine) => favoriteMachineIds.has(machine.id));
+  const recentMachines = useMemo(() => {
+    const seenMachineIds = new Set<number>();
+    const recentMachineIds = sessions.flatMap((session) =>
+      [...session.records].reverse().map((record) => record.machineId),
+    );
+
+    return recentMachineIds
+      .filter((machineId) => {
+        if (seenMachineIds.has(machineId)) {
+          return false;
+        }
+        seenMachineIds.add(machineId);
+        return true;
+      })
+      .map((machineId) => exerciseMachines.find((machine) => machine.id === machineId))
+      .filter((machine): machine is ExerciseMachine => Boolean(machine))
+      .slice(0, 8);
+  }, [exerciseMachines, sessions]);
+  const quickPickMachines = [
+    ...favoriteMachines.slice(0, 8),
+    ...recentMachines.filter((machine) => !favoriteMachineIds.has(machine.id)).slice(0, 8),
+  ].slice(0, 10);
   const summarySession =
     sessions.find((session) => session.id === summarySessionId) ??
     sessions.find((session) => session.status === 'FINISHED' && session.workoutDate === today) ??
@@ -829,6 +897,67 @@ export function App() {
     setActiveView('record');
   }
 
+  function closeExercisePickerStep() {
+    if (exerciseFormOpen) {
+      setSelectedMachineId(null);
+      setExerciseFormOpen(false);
+      return;
+    }
+
+    setExercisePickerOpen(false);
+  }
+
+  function findMachineHistory(machineId: number): MachineHistory[] {
+    return sessions
+      .flatMap((session) =>
+        [...session.records].reverse()
+          .filter((record) => record.machineId === machineId)
+          .map((record) => ({
+            sessionId: session.id,
+            recordId: record.id,
+            workoutDate: session.workoutDate,
+            machineName: record.machineName,
+            sets: record.sets,
+            note: record.note,
+          })),
+      )
+      .slice(0, 10);
+  }
+
+  function selectMachineForRecord(machine: ExerciseMachine) {
+    const latestRecord = findMachineHistory(machine.id)[0];
+    setSelectedGroup(machine.muscleGroup);
+    setSelectedMachineId(machine.id);
+    setExerciseFormOpen(true);
+    setNote('');
+
+    if (latestRecord?.sets.length) {
+      setSets(latestRecord.sets.map(createDraftSetFromHistory));
+      return;
+    }
+
+    setSets([createDraftSet(), createDraftSet(), createDraftSet()]);
+  }
+
+  function toggleFavoriteMachine(machineId: number) {
+    if (!user) {
+      return;
+    }
+
+    const nextFavoriteIds = new Set(favoriteMachineIds);
+    if (nextFavoriteIds.has(machineId)) {
+      nextFavoriteIds.delete(machineId);
+    } else {
+      nextFavoriteIds.add(machineId);
+    }
+
+    setFavoriteMachineIds(nextFavoriteIds);
+    window.localStorage.setItem(
+      `${favoriteExercisesKeyPrefix}:${user.id}`,
+      JSON.stringify(Array.from(nextFavoriteIds)),
+    );
+  }
+
   function resetCustomExerciseForm() {
     setCustomExerciseName('');
     setCustomMovementPattern('');
@@ -945,6 +1074,7 @@ export function App() {
     setCustomExerciseOpen(false);
     setSummarySessionId(null);
     setSessions([]);
+    setFavoriteMachineIds(new Set());
     setUser(null);
     setActiveView('home');
   }
@@ -1379,20 +1509,13 @@ export function App() {
                     차트
                   </button>
                 </div>
-                <select value={marketSymbol} onChange={(event) => setMarketSymbol(event.target.value)}>
-                  {marketSymbolOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <div
                 className={recordVisualMode === 'market' ? 'muscle-visual-card market-mode' : 'muscle-visual-card'}
                 aria-label={recordVisualMode === 'market' ? '운동 중 주식 차트' : '오늘 운동 부위 비주얼'}
               >
-                {recordVisualMode === 'market' && <MarketQuotePanel symbol={marketSymbol} />}
+                {recordVisualMode === 'market' && user && <MarketQuotePanel userId={user.id} />}
               </div>
 
               <div className="workout-log-list">
@@ -1470,10 +1593,7 @@ export function App() {
                   <button
                     className="link-button"
                     type="button"
-                    onClick={() => {
-                      setExercisePickerOpen(false);
-                      setExerciseFormOpen(false);
-                    }}
+                    onClick={closeExercisePickerStep}
                   >
                     닫기
                     <ChevronRight size={16} />
@@ -1482,6 +1602,40 @@ export function App() {
 
                 {!exerciseFormOpen && (
                   <>
+                    {quickPickMachines.length > 0 && (
+                      <section className="quick-machine-section" aria-label="빠른 운동 선택">
+                        <div className="quick-machine-head">
+                          <strong>바로 선택</strong>
+                          <span>즐겨찾기와 최근 기록한 기구를 먼저 보여줍니다.</span>
+                        </div>
+                        <div className="quick-machine-list">
+                          {quickPickMachines.map((machine) => (
+                            <button
+                              className={favoriteMachineIds.has(machine.id) ? 'quick-machine-pill favorite' : 'quick-machine-pill'}
+                              key={`quick-${machine.id}`}
+                              type="button"
+                              onClick={() => selectMachineForRecord(machine)}
+                            >
+                              <span
+                                className="quick-machine-thumb"
+                                style={
+                                  getExerciseAssetUrl(machine.name)
+                                    ? { backgroundImage: `url(${getExerciseAssetUrl(machine.name)})` }
+                                    : undefined
+                                }
+                              >
+                                {!getExerciseAssetUrl(machine.name) && <Dumbbell size={16} />}
+                              </span>
+                              <span>
+                                <strong>{machine.name}</strong>
+                                <small>{favoriteMachineIds.has(machine.id) ? '즐겨찾기' : '최근 사용'}</small>
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+
                     <div className="segment-control">
                       {muscleGroups.map((group) => (
                         <button
@@ -1558,10 +1712,7 @@ export function App() {
                           <button
                             className="machine-card-select"
                             type="button"
-                            onClick={() => {
-                              setSelectedMachineId(machine.id);
-                              setExerciseFormOpen(true);
-                            }}
+                            onClick={() => selectMachineForRecord(machine)}
                           >
                             <div className="machine-card-top">
                               <span
@@ -1574,7 +1725,6 @@ export function App() {
                               >
                                 {!getExerciseAssetUrl(machine.name) && <Dumbbell size={18} />}
                               </span>
-                              <span className="status-dot" />
                             </div>
                             <strong>{machine.name}</strong>
                             <p>{machine.description}</p>
@@ -1583,6 +1733,14 @@ export function App() {
                               <span>#{machine.movementPattern}</span>
                               {machine.custom && <span>#내기구</span>}
                             </div>
+                          </button>
+                          <button
+                            className={favoriteMachineIds.has(machine.id) ? 'favorite-machine-button active' : 'favorite-machine-button'}
+                            type="button"
+                            aria-label={`${machine.name} 즐겨찾기 ${favoriteMachineIds.has(machine.id) ? '해제' : '추가'}`}
+                            onClick={() => toggleFavoriteMachine(machine.id)}
+                          >
+                            <Star size={15} fill={favoriteMachineIds.has(machine.id) ? 'currentColor' : 'none'} />
                           </button>
                           {machine.deletable && (
                             <button
@@ -1693,6 +1851,11 @@ export function App() {
                           >
                             <Trash2 size={16} />
                           </button>
+                          {formatPreviousSet(latestHistory?.sets[index], set) && (
+                            <small className="previous-set-hint">
+                              {formatPreviousSet(latestHistory?.sets[index], set)}
+                            </small>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1746,7 +1909,7 @@ export function App() {
                         <h3>운동 중 현재가</h3>
                       </div>
                       <div className="compact-market-chart">
-                        <MarketQuotePanel symbol={marketSymbol} />
+                        {user && <MarketQuotePanel userId={user.id} />}
                       </div>
                     </div>
 

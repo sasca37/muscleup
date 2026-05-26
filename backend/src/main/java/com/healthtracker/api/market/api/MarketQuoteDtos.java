@@ -2,6 +2,7 @@ package com.healthtracker.api.market.api;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 public final class MarketQuoteDtos {
 
@@ -13,11 +14,22 @@ public final class MarketQuoteDtos {
         String name,
         String exchangeCode,
         String last,
+        String base,
         BigDecimal price,
         String diff,
         String rate,
         String volume,
         Instant fetchedAt
+    ) {
+    }
+
+    public record MarketWatchlistRequest(
+        List<String> symbols
+    ) {
+    }
+
+    public record MarketWatchlistResponse(
+        List<String> symbols
     ) {
     }
 }

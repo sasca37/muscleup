@@ -904,6 +904,8 @@ button {
 
 .muscle-visual-card.market-mode {
   display: grid;
+  aspect-ratio: auto;
+  min-height: 0;
   border-color: #d7e3f3;
   background:
     linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
@@ -983,102 +985,150 @@ button {
 
 .market-quote-panel {
   display: grid;
-  min-height: 100%;
-  align-content: center;
-  gap: 24px;
-  padding: 30px;
+  align-content: start;
+  gap: 8px;
+  padding: 12px;
   color: #102849;
 }
 
-.market-quote-head {
+.market-watchlist-form {
   display: grid;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
-.market-quote-head span,
-.market-price-card span,
-.market-quote-grid span {
-  color: #697484;
-  font-size: 13px;
+.market-watchlist-form input {
+  min-height: 38px;
+  border-radius: 8px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.market-watchlist-form button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  gap: 5px;
+  border: 1px solid #0a66d8;
+  border-radius: 8px;
+  background: #0a66d8;
+  color: #ffffff;
+  padding: 0 12px;
   font-weight: 900;
 }
 
-.market-quote-head strong {
-  color: #06172e;
-  font-size: 30px;
-  line-height: 1;
-}
-
-.market-quote-head small {
+.market-watchlist-form button:disabled {
+  border-color: #d9e0ea;
+  background: #eef2f7;
   color: #8a96a6;
-  font-weight: 800;
 }
 
-.market-price-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 8px;
-  border: 1px solid rgba(10, 102, 216, 0.18);
-  border-radius: 22px;
-  background:
-    radial-gradient(circle at 88% 22%, rgba(89, 160, 255, 0.36), transparent 26%),
-    linear-gradient(135deg, #0a66d8 0%, #1f86ff 52%, #4f6af3 100%);
-  color: #ffffff;
-  padding: 28px;
-  box-shadow: 0 20px 42px rgba(10, 102, 216, 0.22);
-}
-
-.market-price-card div {
-  display: grid;
-  gap: 6px;
-}
-
-.market-price-card strong {
-  font-size: clamp(44px, 8vw, 74px);
-  line-height: 0.98;
-  letter-spacing: 0;
-}
-
-.market-price-card svg {
-  flex: 0 0 auto;
-  color: rgba(255, 255, 255, 0.78);
-}
-
-.market-quote-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 4px;
-}
-
-.market-quote-grid article {
+.market-quote-list {
   display: grid;
   gap: 9px;
-  min-height: 98px;
-  border: 1px solid #dfe8f4;
-  border-radius: 16px;
-  background: #ffffff;
-  padding: 18px;
-  box-shadow: 0 10px 24px rgba(15, 31, 56, 0.05);
 }
 
-.market-quote-grid strong {
+.market-quote-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.15fr) repeat(3, minmax(100px, 1fr)) 34px;
+  align-items: center;
+  border: 1px solid #dfe8f4;
+  border-radius: 8px;
+  background: #ffffff;
   overflow: hidden;
-  color: #06172e;
-  font-size: 17px;
-  line-height: 1.25;
+  box-shadow: 0 8px 20px rgba(15, 31, 56, 0.05);
+}
+
+.market-quote-cell {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  border-left: 1px solid #eef2f7;
+  padding: 12px 14px;
+}
+
+.market-quote-cell:first-child {
+  border-left: 0;
+}
+
+.market-quote-cell span {
+  color: #697484;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.market-quote-cell small {
+  overflow: hidden;
+  color: #8a96a6;
+  font-size: 11px;
+  font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.market-quote-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+.market-quote-cell strong {
+  overflow: hidden;
+  color: #06172e;
+  font-size: 19px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-quote-cell.stock-name strong {
+  font-size: 18px;
+}
+
+.market-quote-cell strong.up {
+  color: #d93535;
+}
+
+.market-quote-cell strong.down {
+  color: #1769d1;
+}
+
+.market-quote-cell strong.flat {
+  color: #697484;
+}
+
+.market-symbol-remove {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  justify-self: center;
+  border: 1px solid #e3e9f2;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #697484;
+  padding: 0;
+}
+
+.market-quote-empty {
+  display: grid;
+  gap: 4px;
+  border: 1px dashed #d9e0ea;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.market-quote-empty strong {
+  color: #102849;
+}
+
+.market-quote-empty span {
   color: #697484;
   font-size: 13px;
+  font-weight: 800;
+}
+
+.market-quote-status {
+  margin: 0;
+  color: #697484;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -1134,34 +1184,27 @@ button {
 }
 
 .compact-market-chart .market-quote-panel {
-  gap: 16px;
-  padding: 16px;
-}
-
-.compact-market-chart .market-quote-head strong {
-  font-size: 22px;
-}
-
-.compact-market-chart .market-price-card {
-  border-radius: 12px;
-  margin-bottom: 4px;
-  padding: 14px;
-}
-
-.compact-market-chart .market-price-card strong {
-  font-size: 34px;
-}
-
-.compact-market-chart .market-quote-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 2px;
-}
-
-.compact-market-chart .market-quote-grid article {
-  min-height: 72px;
-  border-radius: 12px;
+  gap: 8px;
   padding: 12px;
+}
+
+.compact-market-chart .market-quote-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) 34px;
+}
+
+.compact-market-chart .market-quote-cell:nth-child(3) {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.compact-market-chart .market-quote-cell:nth-child(4) {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.compact-market-chart .market-symbol-remove {
+  grid-row: 1 / span 2;
+  grid-column: 3;
 }
 
 .workout-log-list {
@@ -1396,6 +1439,103 @@ button {
   margin-bottom: 16px;
 }
 
+.quick-machine-section {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e1e8f5;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(10, 102, 216, 0.08), transparent 42%),
+    #f8fbff;
+  margin-bottom: 16px;
+  padding: 14px;
+}
+
+.quick-machine-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.quick-machine-head strong {
+  color: #102849;
+  font-weight: 950;
+}
+
+.quick-machine-head span {
+  color: #697484;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.quick-machine-list {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.quick-machine-list::-webkit-scrollbar {
+  display: none;
+}
+
+.quick-machine-pill {
+  display: grid;
+  grid-template-columns: 50px 138px;
+  gap: 9px;
+  align-items: center;
+  flex: 0 0 auto;
+  border: 1px solid #dfe8f4;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #102849;
+  padding: 9px;
+  text-align: left;
+  box-shadow: 0 8px 18px rgba(15, 31, 56, 0.05);
+}
+
+.quick-machine-pill.favorite {
+  border-color: rgba(10, 102, 216, 0.28);
+  background: #f1f6ff;
+}
+
+.quick-machine-thumb {
+  display: grid;
+  width: 50px;
+  height: 44px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 30% 25%, #8fd4ff, transparent 32%),
+    linear-gradient(135deg, #0a66d8, #123b7a);
+  background-position: center;
+  background-size: cover;
+  color: #ffffff;
+}
+
+.quick-machine-pill strong,
+.quick-machine-pill small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-machine-pill strong {
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.quick-machine-pill small {
+  margin-top: 3px;
+  color: #697484;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .segment-control button,
 .sets-header button,
 .secondary-button,
@@ -1488,15 +1628,6 @@ button {
   color: #ffffff;
 }
 
-.status-dot {
-  width: 16px;
-  height: 16px;
-  border: 3px solid #ffffff;
-  border-radius: 999px;
-  background: #35c46a;
-  box-shadow: 0 0 0 1px #cdebd7;
-}
-
 .machine-card strong {
   color: #0a66d8;
   font-size: 16px;
@@ -1534,7 +1665,7 @@ button {
 .machine-delete-button {
   position: absolute;
   top: 12px;
-  right: 12px;
+  right: 48px;
   display: grid;
   width: 30px;
   height: 30px;
@@ -1543,6 +1674,27 @@ button {
   border-radius: 8px;
   background: #fff6f6;
   color: #d93535;
+}
+
+.favorite-machine-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid #dce6f3;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #8a96a6;
+  padding: 0;
+}
+
+.favorite-machine-button.active {
+  border-color: rgba(10, 102, 216, 0.22);
+  background: #f1f6ff;
+  color: #0a66d8;
 }
 
 .custom-exercise-bar {
@@ -1828,6 +1980,20 @@ textarea {
   align-items: center;
   border: 1px solid transparent;
   border-radius: 8px;
+}
+
+.previous-set-hint {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  grid-column: 2 / -1;
+  border-radius: 6px;
+  background: #f4f7fb;
+  color: #697484;
+  line-height: 1.35;
+  padding: 4px 7px;
+  font-size: 12px;
+  font-weight: 850;
 }
 
 .set-row.completed {
@@ -3082,7 +3248,7 @@ button.calendar-day {
 
   .muscle-visual-card.market-mode {
     aspect-ratio: auto;
-    min-height: 430px;
+    min-height: 220px;
   }
 
   .workout-log-item {
@@ -3203,33 +3369,49 @@ button.calendar-day {
 
   .market-quote-panel {
     align-content: start;
-    gap: 18px;
-    padding: 18px;
+    gap: 8px;
+    padding: 12px;
   }
 
-  .market-quote-head strong {
-    font-size: 26px;
+  .market-quote-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) 34px;
   }
 
-  .market-price-card {
-    border-radius: 16px;
-    margin-bottom: 6px;
-    padding: 20px;
+  .market-quote-cell {
+    min-height: 64px;
+    padding: 10px 12px;
   }
 
-  .market-price-card strong {
-    font-size: clamp(42px, 14vw, 58px);
+  .market-quote-cell:nth-child(odd) {
+    border-left: 0;
   }
 
-  .market-quote-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-    margin-top: 2px;
+  .market-quote-cell:nth-child(n + 3) {
+    border-top: 1px solid #eef2f7;
   }
 
-  .market-quote-grid article {
-    min-height: 82px;
-    padding: 14px;
+  .market-quote-cell:nth-child(3) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .market-quote-cell:nth-child(4) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .market-symbol-remove {
+    grid-row: 1 / span 2;
+    grid-column: 3;
+  }
+
+  .market-quote-cell span {
+    font-size: 11px;
+  }
+
+  .market-quote-cell strong,
+  .market-quote-cell.stock-name strong {
+    font-size: 16px;
   }
 
   .activity-session-detail {
@@ -3331,7 +3513,8 @@ button.calendar-day {
     grid-template-columns: 38px minmax(58px, 0.72fr) minmax(52px, 0.6fr) 42px 42px;
     grid-template-areas:
       "number weight reps complete delete"
-      "timer timer timer timer timer";
+      "timer timer timer timer timer"
+      "previous previous previous previous previous";
     gap: 8px;
     border-color: #e1e6ee;
     border-radius: 12px;
@@ -3384,6 +3567,13 @@ button.calendar-day {
     font-size: 14px;
   }
 
+  .previous-set-hint {
+    grid-area: previous;
+    width: 100%;
+    padding: 5px 7px;
+    font-size: 12px;
+  }
+
   .delete-set-button {
     grid-area: delete;
     align-self: stretch;
@@ -3401,9 +3591,29 @@ button.calendar-day {
     gap: 9px;
   }
 
+  .quick-machine-section {
+    margin-bottom: 12px;
+    padding: 12px;
+  }
+
+  .quick-machine-head {
+    display: grid;
+    gap: 3px;
+  }
+
+  .quick-machine-pill {
+    grid-template-columns: 46px 128px;
+    padding: 8px;
+  }
+
+  .quick-machine-thumb {
+    width: 46px;
+    height: 42px;
+  }
+
   .machine-card-grid.compact .machine-card {
     min-height: 0;
-    padding: 12px;
+    padding: 12px 80px 12px 12px;
   }
 
   .machine-card-grid.compact .machine-card-select {
@@ -3425,10 +3635,6 @@ button.calendar-day {
     height: 58px;
   }
 
-  .machine-card-grid.compact .status-dot {
-    display: none;
-  }
-
   .machine-card-grid.compact .machine-card strong {
     grid-area: title;
   }
@@ -3442,6 +3648,16 @@ button.calendar-day {
   .machine-card-grid.compact .machine-tags {
     grid-area: tags;
     margin-top: 0;
+  }
+
+  .machine-card-grid.compact .favorite-machine-button {
+    top: 14px;
+    right: 12px;
+  }
+
+  .machine-card-grid.compact .machine-delete-button {
+    top: 50px;
+    right: 12px;
   }
 
   .form-actions {
