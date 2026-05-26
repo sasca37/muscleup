@@ -20,10 +20,10 @@ public class MarketQuoteService {
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
     private static final ZoneId NEW_YORK_ZONE = ZoneId.of("America/New_York");
-    private static final LocalTime REGULAR_MARKET_OPEN_KST_DST = LocalTime.of(22, 30);
-    private static final LocalTime REGULAR_MARKET_CLOSE_KST_DST = LocalTime.of(5, 0);
-    private static final LocalTime REGULAR_MARKET_OPEN_KST_STANDARD = LocalTime.of(23, 30);
-    private static final LocalTime REGULAR_MARKET_CLOSE_KST_STANDARD = LocalTime.of(6, 0);
+    private static final LocalTime DAY_MARKET_OPEN_KST_DST = LocalTime.of(17, 0);
+    private static final LocalTime MARKET_CLOSE_KST_DST = LocalTime.of(5, 0);
+    private static final LocalTime DAY_MARKET_OPEN_KST_STANDARD = LocalTime.of(18, 0);
+    private static final LocalTime MARKET_CLOSE_KST_STANDARD = LocalTime.of(6, 0);
     private static final String NASDAQ_REGULAR_EXCHANGE_CODE = "NAS";
     private static final String NASDAQ_DAYTIME_EXCHANGE_CODE = "BAQ";
 
@@ -126,16 +126,16 @@ public class MarketQuoteService {
         ZonedDateTime nowKorea = ZonedDateTime.now(KOREA_ZONE);
         ZonedDateTime nowNewYork = nowKorea.withZoneSameInstant(NEW_YORK_ZONE);
         boolean daylightSaving = NEW_YORK_ZONE.getRules().isDaylightSavings(nowKorea.toInstant());
-        LocalTime marketOpen = daylightSaving ? REGULAR_MARKET_OPEN_KST_DST : REGULAR_MARKET_OPEN_KST_STANDARD;
-        LocalTime marketClose = daylightSaving ? REGULAR_MARKET_CLOSE_KST_DST : REGULAR_MARKET_CLOSE_KST_STANDARD;
+        LocalTime marketOpen = daylightSaving ? DAY_MARKET_OPEN_KST_DST : DAY_MARKET_OPEN_KST_STANDARD;
+        LocalTime marketClose = daylightSaving ? MARKET_CLOSE_KST_DST : MARKET_CLOSE_KST_STANDARD;
         DayOfWeek dayOfWeek = nowNewYork.getDayOfWeek();
         boolean weekday = dayOfWeek != DayOfWeek.SATURDAY && dayOfWeek != DayOfWeek.SUNDAY;
-        boolean regularHours = isWithinKoreaRegularMarketWindow(nowKorea.toLocalTime(), marketOpen, marketClose);
+        boolean nasdaqQuoteHours = isWithinKoreaMarketWindow(nowKorea.toLocalTime(), marketOpen, marketClose);
 
-        return weekday && regularHours ? NASDAQ_REGULAR_EXCHANGE_CODE : NASDAQ_DAYTIME_EXCHANGE_CODE;
+        return weekday && nasdaqQuoteHours ? NASDAQ_REGULAR_EXCHANGE_CODE : NASDAQ_DAYTIME_EXCHANGE_CODE;
     }
 
-    private boolean isWithinKoreaRegularMarketWindow(LocalTime now, LocalTime open, LocalTime close) {
+    private boolean isWithinKoreaMarketWindow(LocalTime now, LocalTime open, LocalTime close) {
         return !now.isBefore(open) || now.isBefore(close);
     }
 

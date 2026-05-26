@@ -11,6 +11,7 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Share2,
   Star,
   Timer,
   Trophy,
@@ -339,6 +340,86 @@ function getSessionStats(session: WorkoutSession | null) {
   };
 }
 
+function getWorkoutRecordVolume(record: WorkoutSession['records'][number]) {
+  return record.sets.reduce((total, set) => total + Number(set.weightKg) * set.reps, 0);
+}
+
+function getWorkoutRecordMaxWeight(record: WorkoutSession['records'][number]) {
+  return record.sets.reduce((best, set) => {
+    const weight = Number(set.weightKg);
+    return Number.isFinite(weight) ? Math.max(best, weight) : best;
+  }, 0);
+}
+
+function getWorkoutRecordOneRm(record: WorkoutSession['records'][number]) {
+  return record.sets.reduce((best, set) => {
+    const weight = Number(set.weightKg);
+    if (!Number.isFinite(weight) || set.reps < 1) {
+      return best;
+    }
+
+    return Math.max(best, weight * (1 + set.reps / 30));
+  }, 0);
+}
+
+function loadSummaryImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
+function drawRoundedRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.arcTo(x + width, y, x + width, y + height, radius);
+  context.arcTo(x + width, y + height, x, y + height, radius);
+  context.arcTo(x, y + height, x, y, radius);
+  context.arcTo(x, y, x + width, y, radius);
+  context.closePath();
+}
+
+function drawWrappedText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines = 2,
+) {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+
+  words.forEach((word) => {
+    const nextLine = currentLine ? `${currentLine} ${word}` : word;
+    if (context.measureText(nextLine).width <= maxWidth) {
+      currentLine = nextLine;
+      return;
+    }
+    lines.push(currentLine);
+    currentLine = word;
+  });
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  lines.slice(0, maxLines).forEach((line, index) => {
+    context.fillText(line, x, y + index * lineHeight);
+  });
+}
+
 function getPrescription(goal: TrainingGoal, level: TrainingLevel) {
   if (goal === 'strength') {
     return level === 'advanced' ? '5세트 x 3-5회' : '4세트 x 4-6회';
@@ -652,6 +733,28 @@ export function App() {
     sessions.find((session) => session.status === 'FINISHED' && session.workoutDate === today) ??
     null;
   const summaryStats = getSessionStats(summarySession);
+  const summaryTotalReps = summarySession?.records.reduce(
+    (total, record) => total + record.sets.reduce((setTotal, set) => setTotal + set.reps, 0),
+    0,
+  ) ?? 0;
+  const summaryDurationMinutes = summarySession?.durationSeconds
+    ? Math.max(1, Math.round(summarySession.durationSeconds / 60))
+    : 0;
+  const summaryIntensity = summaryDurationMinutes > 0
+    ? Math.round(summaryStats.volume / summaryDurationMinutes)
+    : 0;
+  const summaryHighlightRecords = summarySession == null
+    ? []
+    : [...summarySession.records]
+        .sort((firstRecord, secondRecord) => getWorkoutRecordVolume(secondRecord) - getWorkoutRecordVolume(firstRecord))
+        .slice(0, 3);
+  const summaryPartHighlights = summaryStats.parts.map((part) => {
+    const representativeRecord = summarySession?.records.find((record) => record.muscleGroupLabel === part);
+    return {
+      label: part,
+      assetUrl: representativeRecord ? getExerciseAssetUrl(representativeRecord.machineName) : null,
+    };
+  });
   const selectedDateSessions = sessions.filter((session) => session.workoutDate === selectedActivityDate);
   const selectedDateStats = selectedDateSessions.reduce(
     (total, session) => {
@@ -1060,6 +1163,133 @@ export function App() {
       setSummarySessionId(null);
       setActiveView('activity');
     }
+  }
+
+  async function shareWorkoutSummaryImage(session: WorkoutSession) {
+    const stats = getSessionStats(session);
+    const totalReps = session.records.reduce(
+      (total, record) => total + record.sets.reduce((setTotal, set) => setTotal + set.reps, 0),
+      0,
+    );
+    const durationMinutes = session.durationSeconds ? Math.max(1, Math.round(session.durationSeconds / 60)) : 0;
+    const intensity = durationMinutes > 0 ? Math.round(stats.volume / durationMinutes) : 0;
+    const canvas = document.createElement('canvas');
+    canvas.width = 1080;
+    canvas.height = 1920;
+    const context = canvas.getContext('2d');
+
+    if (!context) {
+      return;
+    }
+
+    const backgroundGradient = context.createLinearGradient(0, 0, 0, canvas.height);
+    backgroundGradient.addColorStop(0, '#ffffff');
+    backgroundGradient.addColorStop(0.55, '#f6faff');
+    backgroundGradient.addColorStop(1, '#eaf4ff');
+    context.fillStyle = backgroundGradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#102849';
+    context.textAlign = 'center';
+    context.font = '700 48px Arial, sans-serif';
+    context.fillText(`${formatWorkoutDateLabel(session.workoutDate)} 운동`, 540, 128);
+    context.fillStyle = '#697484';
+    context.font = '700 28px Arial, sans-serif';
+    context.fillText(session.workoutDate.replace(/-/g, '.'), 540, 170);
+
+    const metrics = [
+      [`${stats.exerciseCount}`, 'EXERCISES'],
+      [`${stats.setCount}`, 'SETS'],
+      [`${totalReps}`, 'REPS'],
+      [`${Math.round(stats.volume).toLocaleString()}`, 'VOLUME KG'],
+      [durationMinutes ? `${durationMinutes}` : '-', 'DURATION MIN'],
+      [intensity ? `${intensity}` : '-', 'KG / MIN'],
+    ];
+
+    metrics.forEach(([value, label], index) => {
+      const column = index % 3;
+      const row = Math.floor(index / 3);
+      const x = 180 + column * 360;
+      const y = 300 + row * 170;
+      context.fillStyle = '#06172e';
+      context.font = '800 54px Arial, sans-serif';
+      context.fillText(value, x, y);
+      context.fillStyle = '#697484';
+      context.font = '800 24px Arial, sans-serif';
+      context.fillText(label, x, y + 54);
+    });
+
+    context.textAlign = 'left';
+    let y = 730;
+    for (const record of session.records.slice(0, 5)) {
+      const maxWeight = getWorkoutRecordMaxWeight(record);
+      const oneRm = Math.round(getWorkoutRecordOneRm(record));
+      context.fillStyle = '#102849';
+      context.font = '800 34px Arial, sans-serif';
+      drawWrappedText(context, record.machineName, 72, y, 650, 40, 1);
+      context.fillStyle = '#697484';
+      context.font = '700 24px Arial, sans-serif';
+      context.fillText(`최고 무게: ${maxWeight || '-'}kg  |  1RM: ${oneRm || '-'}kg`, 72, y + 44);
+
+      record.sets.slice(0, 6).forEach((set, index) => {
+        const circleX = 72 + index * 118;
+        const circleY = y + 112;
+        context.fillStyle = '#0a66d8';
+        drawRoundedRect(context, circleX, circleY, 86, 86, 43);
+        context.fill();
+        context.fillStyle = '#ffffff';
+        context.textAlign = 'center';
+        context.font = '800 34px Arial, sans-serif';
+        context.fillText(String(set.weightKg), circleX + 43, circleY + 54);
+        context.fillStyle = '#697484';
+        context.font = '800 22px Arial, sans-serif';
+        context.fillText(`${set.reps}X`, circleX + 43, circleY + 124);
+        context.textAlign = 'left';
+      });
+
+      const assetUrl = getExerciseAssetUrl(record.machineName);
+      if (assetUrl) {
+        try {
+          const image = await loadSummaryImage(assetUrl);
+          context.drawImage(image, 790, y + 26, 210, 160);
+        } catch {
+          // Ignore image failures so sharing still works.
+        }
+      }
+
+      y += 270;
+      if (y > 1660) {
+        break;
+      }
+    }
+
+    context.textAlign = 'center';
+    context.fillStyle = '#102849';
+    context.font = '900 36px Arial, sans-serif';
+    context.fillText('Repick', 540, 1810);
+    context.fillStyle = '#0a66d8';
+    context.font = '800 24px Arial, sans-serif';
+    context.fillText('오늘의 운동 기록', 540, 1852);
+
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) {
+      return;
+    }
+
+    const file = new File([blob], `repick-${session.workoutDate}.png`, { type: 'image/png' });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: 'Repick 운동 기록',
+      });
+      return;
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = file.name;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   function logout() {
@@ -2016,12 +2246,16 @@ export function App() {
           <section className="workout-summary-page">
             <div className="section-heading">
               <div>
-                <h2>운동 요약</h2>
-                <p>{formatWorkoutDateLabel(summarySession.workoutDate)} 기록을 한 페이지로 정리했습니다.</p>
+                <h2>운동 완료</h2>
+                <p>{formatWorkoutDateLabel(summarySession.workoutDate)} 하루 운동을 멋지게 끝냈습니다.</p>
               </div>
               <button className="link-button" type="button" onClick={() => setActiveView('activity')}>
                 내 활동에서 보기
                 <ChevronRight size={16} />
+              </button>
+              <button className="summary-share-button" type="button" onClick={() => shareWorkoutSummaryImage(summarySession)}>
+                <Share2 size={17} />
+                공유하기
               </button>
               <button className="danger-link-button" type="button" onClick={() => deleteWorkoutSession(summarySession.id)}>
                 <Trash2 size={16} />
@@ -2029,32 +2263,144 @@ export function App() {
               </button>
             </div>
 
-            <section className="summary-hero-card">
-              <div>
-                <span>{summarySession.status === 'FINISHED' ? 'Workout Complete' : 'Workout Draft'}</span>
-                <strong>{summaryStats.exerciseCount}개 운동 · {summaryStats.setCount}세트</strong>
-                <p>
-                  {summarySession.durationSeconds
-                    ? `${formatDuration(summarySession.durationSeconds)} 동안 기록했습니다.`
-                    : '운동 시간이 아직 종료 기록에 반영되지 않았습니다.'}
-                </p>
-              </div>
-              <div className="summary-volume">
-                <small>총 볼륨</small>
-                <strong>{Math.round(summaryStats.volume).toLocaleString()} kg</strong>
+            <section className="summary-showcase">
+              <article className="summary-story-card">
+                <div className="summary-story-top">
+                  <span>Repick</span>
+                  <small>{formatWorkoutDateLabel(summarySession.workoutDate)}</small>
+                </div>
+
+                <div className="summary-story-header">
+                  <strong>오늘 운동 완료</strong>
+                  <span>{summarySession.workoutDate.replace(/-/g, '.')}</span>
+                </div>
+
+                <div className="summary-story-stat-grid">
+                  <div>
+                    <strong>{summaryStats.exerciseCount}</strong>
+                    <span>EXERCISES</span>
+                  </div>
+                  <div>
+                    <strong>{summaryStats.setCount}</strong>
+                    <span>SETS</span>
+                  </div>
+                  <div>
+                    <strong>{summaryTotalReps}</strong>
+                    <span>REPS</span>
+                  </div>
+                  <div>
+                    <strong>{Math.round(summaryStats.volume).toLocaleString()}</strong>
+                    <span>VOLUME KG</span>
+                  </div>
+                  <div>
+                    <strong>{summaryDurationMinutes || '-'}</strong>
+                    <span>DURATION MIN</span>
+                  </div>
+                  <div>
+                    <strong>{summaryIntensity || '-'}</strong>
+                    <span>KG / MIN</span>
+                  </div>
+                </div>
+
+                <div className="summary-story-records">
+                  {summarySession.records.slice(0, 5).map((record) => (
+                    <article className="summary-story-record" key={record.id}>
+                      <div>
+                        <strong>{record.machineName}</strong>
+                        <span>
+                          최고 무게: {getWorkoutRecordMaxWeight(record) || '-'}kg
+                          {' '}| 1RM: {Math.round(getWorkoutRecordOneRm(record)) || '-'}kg
+                        </span>
+                        <div className="summary-story-set-row">
+                          {record.sets.slice(0, 6).map((set, index) => (
+                            <span className="summary-story-set" key={`${record.id}-${index}`}>
+                              <strong>{set.weightKg}</strong>
+                              <small>{set.reps}X</small>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <span
+                        className="summary-story-record-image"
+                        style={
+                          getExerciseAssetUrl(record.machineName)
+                            ? { backgroundImage: `url(${getExerciseAssetUrl(record.machineName)})` }
+                            : undefined
+                        }
+                      >
+                        {!getExerciseAssetUrl(record.machineName) && <Dumbbell size={24} />}
+                      </span>
+                    </article>
+                  ))}
+                </div>
+              </article>
+
+              <div className="summary-report-panel">
+                <section className="summary-hero-card">
+                  <div>
+                    <span>Great Work</span>
+                    <strong>{summaryStats.exerciseCount}개 운동 · {summaryStats.setCount}세트</strong>
+                    <p>
+                      {summaryStats.parts.length > 0
+                        ? `${summaryStats.parts.join(', ')} 루틴을 완료했습니다.`
+                        : '기록된 부위가 아직 없습니다.'}
+                    </p>
+                  </div>
+                  <div className="summary-volume">
+                    <small>총 볼륨</small>
+                    <strong>{Math.round(summaryStats.volume).toLocaleString()} kg</strong>
+                  </div>
+                </section>
+
+                <div className="summary-part-row">
+                  {summaryPartHighlights.length === 0 && <span>기록된 부위 없음</span>}
+                  {summaryPartHighlights.map((part) => (
+                    <span key={part.label}>
+                      {part.assetUrl && <i style={{ backgroundImage: `url(${part.assetUrl})` }} />}
+                      {part.label}
+                    </span>
+                  ))}
+                </div>
+
+                {summaryHighlightRecords.length > 0 && (
+                  <section className="summary-highlight-list">
+                    {summaryHighlightRecords.map((record, index) => (
+                      <article className="summary-highlight-card" key={record.id}>
+                        <span
+                          className="summary-highlight-thumb"
+                          style={
+                            getExerciseAssetUrl(record.machineName)
+                              ? { backgroundImage: `url(${getExerciseAssetUrl(record.machineName)})` }
+                              : undefined
+                          }
+                        >
+                          {!getExerciseAssetUrl(record.machineName) && <Dumbbell size={20} />}
+                        </span>
+                        <div>
+                          <small>TOP {index + 1}</small>
+                          <strong>{record.machineName}</strong>
+                          <p>{Math.round(getWorkoutRecordVolume(record)).toLocaleString()}kg · {record.sets.length}세트</p>
+                        </div>
+                      </article>
+                    ))}
+                  </section>
+                )}
               </div>
             </section>
-
-            <div className="summary-part-row">
-              {summaryStats.parts.length === 0 && <span>기록된 부위 없음</span>}
-              {summaryStats.parts.map((part) => (
-                <span key={part}>{part}</span>
-              ))}
-            </div>
 
             <div className="summary-record-list">
               {summarySession.records.map((record) => (
                 <article className="summary-record-card" key={record.id}>
+                  <span
+                    className="summary-record-thumb"
+                    style={
+                      getExerciseAssetUrl(record.machineName)
+                        ? { backgroundImage: `url(${getExerciseAssetUrl(record.machineName)})` }
+                        : undefined
+                    }
+                  >
+                    {!getExerciseAssetUrl(record.machineName) && <Dumbbell size={18} />}
+                  </span>
                   <div>
                     <strong>{record.machineName}</strong>
                     <span>{record.muscleGroupLabel} · {record.sets.length}세트</span>
