@@ -2,6 +2,7 @@ package com.healthtracker.api.workout.api;
 
 import com.healthtracker.api.workout.service.WorkoutSessionService;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -88,5 +89,24 @@ public class WorkoutSessionController {
         return WorkoutSessionDtos.WorkoutSessionResponse.from(
             workoutSessionService.finishSession(userId, sessionId)
         );
+    }
+
+    @DeleteMapping("/{sessionId}/records/{recordId}")
+    public WorkoutSessionDtos.WorkoutSessionResponse deleteRecord(
+        @RequestHeader(USER_ID_HEADER) String userId,
+        @PathVariable String sessionId,
+        @PathVariable String recordId
+    ) {
+        return WorkoutSessionDtos.WorkoutSessionResponse.from(
+            workoutSessionService.deleteRecord(userId, sessionId, recordId)
+        );
+    }
+
+    @DeleteMapping("/{sessionId}")
+    public void deleteSession(
+        @RequestHeader(USER_ID_HEADER) String userId,
+        @PathVariable String sessionId
+    ) {
+        workoutSessionService.deleteSession(userId, sessionId);
     }
 }

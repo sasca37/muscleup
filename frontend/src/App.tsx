@@ -38,7 +38,7 @@ type DraftSet = {
   remainingSeconds: number;
 };
 
-type ActiveView = 'home' | 'planner' | 'record' | 'history' | 'oneRm' | 'activity' | 'summary';
+type ActiveView = 'home' | 'planner' | 'record' | 'oneRm' | 'activity' | 'summary';
 type OneRmLift = 'squat' | 'benchPress' | 'deadlift' | 'overheadPress';
 type TrainingLevel = 'beginner' | 'intermediate' | 'advanced';
 type TrainingGoal = 'strength' | 'hypertrophy' | 'balanced';
@@ -56,6 +56,7 @@ type RoutineDay = {
 
 type ActiveWorkoutRecord = {
   id: string;
+  sessionId: string;
   machineName: string;
   muscleGroupLabel: string;
   setsCount: number;
@@ -186,6 +187,99 @@ function formatWorkoutSetSummary(sets: ActiveWorkoutRecord['sets']) {
   }
 
   return sets.map((set) => `${set.weightKg}kg x ${set.reps}회`).join(' / ');
+}
+
+const exerciseAssetRules: { keywords: string[]; assetUrl: string }[] = [
+  {
+    keywords: ['인클라인', 'incline'],
+    assetUrl: '/exercises/incline-press-anatomy.png',
+  },
+  {
+    keywords: ['플라이', '펙덱', '크로스오버', 'fly', 'pec deck', 'crossover'],
+    assetUrl: '/exercises/chest-fly-anatomy.png',
+  },
+  {
+    keywords: ['벤치', '체스트 프레스', '디클라인', '푸쉬업', '푸시업', '딥스', 'bench', 'chest press', 'push up', 'pushup', 'dip'],
+    assetUrl: '/exercises/bench-press-anatomy.png',
+  },
+  {
+    keywords: ['랫풀', '풀다운', '풀업', '스트레이트 암', '풀오버', 'lat', 'pulldown', 'pullup', 'pull up', 'pullover'],
+    assetUrl: '/exercises/lat-pulldown-anatomy.png',
+  },
+  {
+    keywords: ['시티드 로우', '티바 로우', '덤벨 로우', '하이 로우', '로우 머신', 'seated row', 't-bar', 'tbar', 'dumbbell row', 'high row'],
+    assetUrl: '/exercises/seated-row-anatomy.png',
+  },
+  {
+    keywords: ['데드리프트', '루마니안', '백 익스텐션', 'deadlift', 'romanian', 'back extension'],
+    assetUrl: '/exercises/deadlift-anatomy.png',
+  },
+  {
+    keywords: ['레그 프레스', 'leg press'],
+    assetUrl: '/exercises/leg-press-anatomy.png',
+  },
+  {
+    keywords: ['레그 익스텐션', 'leg extension'],
+    assetUrl: '/exercises/leg-extension-anatomy.png',
+  },
+  {
+    keywords: ['레그 컬', 'leg curl'],
+    assetUrl: '/exercises/leg-curl-anatomy.png',
+  },
+  {
+    keywords: ['힙 쓰러스트', '힙 어브덕션', 'hip thrust', 'abduction'],
+    assetUrl: '/exercises/hip-thrust-anatomy.png',
+  },
+  {
+    keywords: ['카프', 'calf'],
+    assetUrl: '/exercises/calf-raise-anatomy.png',
+  },
+  {
+    keywords: ['스쿼트', '런지', 'squat', 'lunge'],
+    assetUrl: '/exercises/squat-anatomy.png',
+  },
+  {
+    keywords: ['숄더 프레스', '오버헤드프레스', '오버헤드 프레스', 'shoulder press', 'overhead press'],
+    assetUrl: '/exercises/shoulder-press-anatomy.png',
+  },
+  {
+    keywords: ['리어 델트', '페이스 풀', 'rear delt', 'face pull'],
+    assetUrl: '/exercises/rear-delt-fly-anatomy.png',
+  },
+  {
+    keywords: ['레터럴', '숄더 레이즈', '업라이트', '프론트 레이즈', 'lateral', 'upright row', 'front raise'],
+    assetUrl: '/exercises/lateral-raise-anatomy.png',
+  },
+  {
+    keywords: ['푸시다운', '트라이셉스', '스컬 크러셔', 'triceps', 'pushdown', 'skull crusher'],
+    assetUrl: '/exercises/triceps-pushdown-anatomy.png',
+  },
+  {
+    keywords: ['암 컬', '덤벨 컬', '해머 컬', '프리처 컬', '로프 컬', '리버스 컬', 'biceps', 'curl', 'hammer curl', 'preacher curl'],
+    assetUrl: '/exercises/biceps-curl-anatomy.png',
+  },
+  {
+    keywords: ['크런치', '토르소', '팔로프', 'crunch', 'torso', 'pallof'],
+    assetUrl: '/exercises/cable-crunch-anatomy.png',
+  },
+  {
+    keywords: ['플랭크', '레그레이즈', '데드버그', '롤아웃', '마운틴 클라이머', 'plank', 'leg raise', 'dead bug', 'rollout', 'mountain climber'],
+    assetUrl: '/exercises/plank-anatomy.png',
+  },
+];
+
+function getExerciseAssetUrl(name: string) {
+  const normalizedName = name.toLowerCase();
+  const compactName = normalizedName.replace(/\s+/g, '');
+
+  return (
+    exerciseAssetRules.find((rule) =>
+      rule.keywords.some((keyword) => {
+        const normalizedKeyword = keyword.toLowerCase();
+        return normalizedName.includes(normalizedKeyword) || compactName.includes(normalizedKeyword.replace(/\s+/g, ''));
+      }),
+    )?.assetUrl ?? null
+  );
 }
 
 function getSessionStats(session: WorkoutSession | null) {
@@ -430,16 +524,6 @@ export function App() {
       sessionTotal + session.records.reduce((recordTotal, record) => recordTotal + record.sets.length, 0),
     0,
   );
-  const allHistoryItems: MachineHistory[] = sessions.flatMap((session) =>
-    session.records.map((record) => ({
-      sessionId: session.id,
-      recordId: record.id,
-      workoutDate: session.workoutDate,
-      machineName: record.machineName,
-      sets: record.sets,
-      note: record.note,
-    })),
-  );
   const latestHistory = history[0];
   const oneRmWeightValue = Number(oneRmWeight);
   const oneRmRepsValue = Number(oneRmReps);
@@ -483,6 +567,7 @@ export function App() {
   const todaysWorkoutRecords: ActiveWorkoutRecord[] = todaysSessions.flatMap((session) =>
     session.records.map((record) => ({
       id: record.id,
+      sessionId: session.id,
       machineName: record.machineName,
       muscleGroupLabel: record.muscleGroupLabel,
       setsCount: record.sets.length,
@@ -603,6 +688,7 @@ export function App() {
   function toActiveWorkoutRecords(session: WorkoutSession): ActiveWorkoutRecord[] {
     return session.records.map((record) => ({
       id: record.id,
+      sessionId: session.id,
       machineName: record.machineName,
       muscleGroupLabel: record.muscleGroupLabel,
       setsCount: record.sets.length,
@@ -684,6 +770,18 @@ export function App() {
 
   async function finishWorkout() {
     let nextSummarySessionId = activeSessionId;
+    const sessionToFinish = activeSessionId
+      ? sessions.find((session) => session.id === activeSessionId)
+      : null;
+    const recordCount = sessionToFinish?.records.length ?? activeWorkoutRecords.length;
+
+    if (recordCount === 0) {
+      setError('운동을 1개 이상 추가한 뒤 종료할 수 있습니다.');
+      setExercisePickerOpen(true);
+      setExerciseFormOpen(false);
+      setActiveView('record');
+      return;
+    }
 
     if (user && activeSessionId && !isLocalSession(activeSessionId)) {
       try {
@@ -727,10 +825,6 @@ export function App() {
   }
 
   async function openExercisePicker() {
-    if (workoutStartedAt == null) {
-      await ensureWorkoutSessionStarted();
-    }
-
     setSelectedMachineId(null);
     setExerciseFormOpen(false);
     setExercisePickerOpen(true);
@@ -787,6 +881,57 @@ export function App() {
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : '커스텀 운동 삭제에 실패했습니다.');
+    }
+  }
+
+  async function deleteWorkoutRecord(sessionId: string, recordId: string) {
+    setError(null);
+
+    if (isLocalSession(sessionId) || !user) {
+      setSessions((current) =>
+        current.map((session) =>
+          session.id === sessionId
+            ? { ...session, records: session.records.filter((record) => record.id !== recordId) }
+            : session,
+        ),
+      );
+      setActiveWorkoutRecords((current) => current.filter((record) => record.id !== recordId));
+      return;
+    }
+
+    try {
+      const updatedSession = await api.deleteWorkoutRecord(user.id, sessionId, recordId);
+      upsertSession(updatedSession);
+      if (activeSessionId === sessionId) {
+        setActiveWorkoutRecords(toActiveWorkoutRecords(updatedSession));
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '운동 기록 삭제에 실패했습니다.');
+    }
+  }
+
+  async function deleteWorkoutSession(sessionId: string) {
+    setError(null);
+
+    if (!isLocalSession(sessionId) && user) {
+      try {
+        await api.deleteWorkoutSession(user.id, sessionId);
+      } catch (error) {
+        setError(error instanceof Error ? error.message : '운동 세션 삭제에 실패했습니다.');
+        return;
+      }
+    }
+
+    setSessions((current) => current.filter((session) => session.id !== sessionId));
+    if (activeSessionId === sessionId) {
+      setActiveSessionId(null);
+      setWorkoutStartedAt(null);
+      setWorkoutElapsedSeconds(0);
+      setActiveWorkoutRecords([]);
+    }
+    if (summarySessionId === sessionId) {
+      setSummarySessionId(null);
+      setActiveView('activity');
     }
   }
 
@@ -880,6 +1025,7 @@ export function App() {
 
         const activeRecord: ActiveWorkoutRecord = {
           id: localRecord.id,
+          sessionId,
           machineName: localRecord.machineName,
           muscleGroupLabel: localRecord.muscleGroupLabel,
           setsCount: localRecord.sets.length,
@@ -918,9 +1064,6 @@ export function App() {
           <button className={activeView === 'record' ? 'active' : ''} type="button" onClick={() => setActiveView('record')}>
             운동기록
           </button>
-          <button className={activeView === 'history' ? 'active' : ''} type="button" onClick={() => setActiveView('history')}>
-            히스토리
-          </button>
           <button className={activeView === 'oneRm' ? 'active' : ''} type="button" onClick={() => setActiveView('oneRm')}>
             1RM
           </button>
@@ -946,8 +1089,8 @@ export function App() {
             <br />
             기구별로 남겨볼까요?
           </h1>
-          <button type="button" onClick={workoutStartedAt == null ? startWorkout : () => setActiveView('record')}>
-            {workoutStartedAt == null ? '운동 시작' : '운동 이어가기'}
+          <button type="button" onClick={() => setActiveView('record')}>
+            {workoutStartedAt == null ? '운동 기록 열기' : '운동 이어가기'}
           </button>
         </div>
       </section>
@@ -960,8 +1103,8 @@ export function App() {
                 <h2>오늘의 Repick</h2>
                 <p>기록, 휴식 타이머, 이전 수행 기록을 한 흐름으로 관리합니다.</p>
               </div>
-              <button className="link-button" type="button" onClick={workoutStartedAt == null ? startWorkout : () => setActiveView('record')}>
-                {workoutStartedAt == null ? '운동 시작하기' : '운동 이어가기'}
+              <button className="link-button" type="button" onClick={() => setActiveView('record')}>
+                {workoutStartedAt == null ? '운동 기록 열기' : '운동 이어가기'}
                 <ChevronRight size={16} />
               </button>
             </div>
@@ -972,15 +1115,15 @@ export function App() {
                 <strong>{workoutStartedAt == null ? '오늘 운동을 시작해볼까요?' : formatSeconds(workoutElapsedSeconds)}</strong>
                 <p>
                   {workoutStartedAt == null
-                    ? '시작 버튼을 누르면 운동 시간이 기록되고, 저장한 종목과 부위가 세션 요약에 쌓입니다.'
+                    ? '운동기록 화면에서 시작을 누르면 운동 시간이 기록되고, 저장한 종목과 부위가 세션 요약에 쌓입니다.'
                     : `${activeWorkoutRecords.length}개 운동, ${activeWorkoutSetCount}세트 진행 중`}
                 </p>
               </div>
               <div className="workout-status-actions">
                 {workoutStartedAt == null ? (
-                  <button className="primary-button" type="button" onClick={startWorkout}>
+                  <button className="primary-button" type="button" onClick={() => setActiveView('record')}>
                     <Timer size={16} />
-                    운동 시작
+                    운동 기록 열기
                   </button>
                 ) : (
                   <>
@@ -1031,10 +1174,6 @@ export function App() {
               <button type="button" onClick={() => setActiveView('planner')}>
                 <strong>AI 루틴 설계</strong>
                 <span>프로필과 분할 방식을 고르면 주간 플랜 초안을 만듭니다.</span>
-              </button>
-              <button type="button" onClick={() => setActiveView('history')}>
-                <strong>히스토리 보기</strong>
-                <span>최근 저장한 기록과 기구별 수행 내역을 확인합니다.</span>
               </button>
               <button type="button" onClick={() => setActiveView('oneRm')}>
                 <strong>1RM 계산기</strong>
@@ -1255,25 +1394,39 @@ export function App() {
               <div className="workout-log-list">
                 {visibleWorkoutRecords.length === 0 && (
                   <article className="workout-log-empty">
-                    <Dumbbell size={24} />
-                    <strong>아직 추가된 운동이 없습니다</strong>
-                    <p>운동 추가를 누르면 부위별 운동 목록과 세트 입력 화면이 열립니다.</p>
+                    <span className="workout-empty-icon">
+                      <Dumbbell size={22} />
+                    </span>
+                    <div>
+                      <strong>아직 추가된 운동이 없습니다</strong>
+                      <p>운동 추가를 누르면 부위별 운동 목록과 세트 입력 화면이 열립니다.</p>
+                    </div>
                   </article>
                 )}
                 {visibleWorkoutRecords.map((record) => (
                   <article className="workout-log-item" key={`${record.id}-${record.workoutDate}`}>
-                    <span className="workout-log-thumb">
-                      <Dumbbell size={24} />
+                    <span
+                      className="workout-log-thumb"
+                      style={
+                        getExerciseAssetUrl(record.machineName)
+                          ? { backgroundImage: `url(${getExerciseAssetUrl(record.machineName)})` }
+                          : undefined
+                      }
+                    >
+                      {!getExerciseAssetUrl(record.machineName) && <Dumbbell size={24} />}
                     </span>
                     <div>
                       <strong>{record.machineName}</strong>
                       <p>{record.muscleGroupLabel} · {record.setsCount}세트</p>
                       <small>{formatWorkoutSetSummary(record.sets)}</small>
                     </div>
-                    <button className="icon-button" type="button" aria-label={`${record.machineName} 옵션`}>
-                      <span />
-                      <span />
-                      <span />
+                    <button
+                      className="delete-record-button"
+                      type="button"
+                      aria-label={`${record.machineName} 기록 삭제`}
+                      onClick={() => deleteWorkoutRecord(record.sessionId, record.id)}
+                    >
+                      <Trash2 size={17} />
                     </button>
                   </article>
                 ))}
@@ -1407,8 +1560,15 @@ export function App() {
                             }}
                           >
                             <div className="machine-card-top">
-                              <span className="machine-avatar">
-                                <Dumbbell size={18} />
+                              <span
+                                className="machine-avatar"
+                                style={
+                                  getExerciseAssetUrl(machine.name)
+                                    ? { backgroundImage: `url(${getExerciseAssetUrl(machine.name)})` }
+                                    : undefined
+                                }
+                              >
+                                {!getExerciseAssetUrl(machine.name) && <Dumbbell size={18} />}
                               </span>
                               <span className="status-dot" />
                             </div>
@@ -1493,13 +1653,13 @@ export function App() {
                           <span className="set-number">{index + 1}</span>
                           <input
                             inputMode="decimal"
-                            placeholder="무게 kg"
+                            placeholder="kg"
                             value={set.weightKg}
                             onChange={(event) => updateSet(set.id, 'weightKg', event.target.value)}
                           />
                           <input
                             inputMode="numeric"
-                            placeholder="횟수"
+                            placeholder="회"
                             value={set.reps}
                             onChange={(event) => updateSet(set.id, 'reps', event.target.value)}
                           />
@@ -1611,35 +1771,6 @@ export function App() {
           </section>
         )}
 
-        {activeView === 'history' && (
-          <section className="history-page">
-            <div className="section-heading">
-              <div>
-                <h2>전체 운동 히스토리</h2>
-                <p>저장한 세션과 세트 기록을 최신순으로 확인합니다.</p>
-              </div>
-              <button className="link-button" type="button" onClick={() => setActiveView('record')}>
-                새 기록
-                <ChevronRight size={16} />
-              </button>
-            </div>
-
-            <div className="history-page-list">
-              {allHistoryItems.length === 0 && <p className="empty">아직 저장된 기록이 없습니다.</p>}
-              {allHistoryItems.map((item) => (
-                <article className="history-card" key={item.recordId}>
-                  <div>
-                    <strong>{item.machineName}</strong>
-                    <span>{item.workoutDate}</span>
-                  </div>
-                  <p>{item.sets.map((set) => `${set.weightKg}kg x ${set.reps}`).join(' / ')}</p>
-                  {item.note && <small>{item.note}</small>}
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-
         {activeView === 'oneRm' && (
           <section className="one-rm-page">
             <div className="section-heading">
@@ -1724,6 +1855,10 @@ export function App() {
               <button className="link-button" type="button" onClick={() => setActiveView('activity')}>
                 내 활동에서 보기
                 <ChevronRight size={16} />
+              </button>
+              <button className="danger-link-button" type="button" onClick={() => deleteWorkoutSession(summarySession.id)}>
+                <Trash2 size={16} />
+                세션 삭제
               </button>
             </div>
 
@@ -1843,22 +1978,36 @@ export function App() {
             {selectedDateSessions.map((session) => {
               const stats = getSessionStats(session);
               return (
-                <button
+                <article
                   className="activity-session-detail"
                   key={session.id}
-                  type="button"
-                  onClick={() => {
-                    setSummarySessionId(session.id);
-                    setActiveView('summary');
-                  }}
                 >
                   <div>
                     <strong>{stats.exerciseCount}개 운동</strong>
                     <span>{stats.parts.join(', ') || '부위 기록 없음'}</span>
                   </div>
                   <p>{stats.setCount}세트 · {Math.round(stats.volume).toLocaleString()}kg</p>
-                  <ChevronRight size={16} />
-                </button>
+                  <div className="activity-session-actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSummarySessionId(session.id);
+                        setActiveView('summary');
+                      }}
+                    >
+                      상세
+                      <ChevronRight size={16} />
+                    </button>
+                    <button
+                      className="danger-icon-button"
+                      type="button"
+                      aria-label={`${session.workoutDate} 세션 삭제`}
+                      onClick={() => deleteWorkoutSession(session.id)}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </article>
               );
             })}
           </section>

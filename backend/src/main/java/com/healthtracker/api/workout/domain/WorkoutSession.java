@@ -63,6 +63,14 @@ public class WorkoutSession {
         this.updatedAt = Instant.now();
     }
 
+    public boolean removeRecord(String recordId) {
+        boolean removed = this.records.removeIf((record) -> record.getRecordId().equals(recordId));
+        if (removed) {
+            this.updatedAt = Instant.now();
+        }
+        return removed;
+    }
+
     public void finish() {
         if (this.status == WorkoutSessionStatus.FINISHED) {
             return;

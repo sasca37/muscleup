@@ -103,8 +103,34 @@ public class WorkoutSessionService {
         validateUser(userId);
 
         WorkoutSession session = findSessionForUser(sessionId, userId);
+        if (session.getRecords().isEmpty()) {
+            throw new InvalidWorkoutSessionRequestException("운동을 1개 이상 추가한 뒤 종료할 수 있습니다.");
+        }
+
         session.finish();
         return workoutSessionRepository.save(session);
+    }
+
+    public WorkoutSession deleteRecord(String userId, String sessionId, String recordId) {
+        validateUser(userId);
+
+        if (recordId == null || recordId.isBlank()) {
+            throw new InvalidWorkoutSessionRequestException("운동 기록 ID는 필수입니다.");
+        }
+
+        WorkoutSession session = findSessionForUser(sessionId, userId);
+        if (!session.removeRecord(recordId)) {
+            throw new InvalidWorkoutSessionRequestException("운동 기록을 찾을 수 없습니다.");
+        }
+
+        return workoutSessionRepository.save(session);
+    }
+
+    public void deleteSession(String userId, String sessionId) {
+        validateUser(userId);
+
+        WorkoutSession session = findSessionForUser(sessionId, userId);
+        workoutSessionRepository.delete(session);
     }
 
     private WorkoutSession findSessionForUser(String sessionId, String userId) {

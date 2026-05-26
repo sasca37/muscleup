@@ -109,4 +109,14 @@ export const api = {
       method: 'PATCH',
     }));
   },
+  deleteWorkoutRecord(userId: string, sessionId: string, recordId: string) {
+    return request<WorkoutSession>(`/api/workout-sessions/${sessionId}/records/${recordId}`, withUser(userId, {
+      method: 'DELETE',
+    }));
+  },
+  deleteWorkoutSession(userId: string, sessionId: string) {
+    return request<void>(`/api/workout-sessions/${sessionId}`, withUser(userId, {
+      method: 'DELETE',
+    }));
+  },
 };
