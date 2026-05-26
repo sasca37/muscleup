@@ -113,3 +113,15 @@ export type CreateCustomExercisePayload = {
   movementPattern?: string;
   description?: string;
 };
+
+export type MarketQuote = {
+  symbol: string;
+  name: string;
+  exchangeCode: string;
+  last: string;
+  price: number | null;
+  diff: string | null;
+  rate: string | null;
+  volume: string | null;
+  fetchedAt: string;
+};

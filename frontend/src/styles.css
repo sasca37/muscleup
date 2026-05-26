@@ -863,6 +863,15 @@ button {
     linear-gradient(120deg, rgba(7, 15, 34, 0.98), rgba(18, 16, 42, 0.98) 62%, rgba(6, 15, 34, 0.98));
 }
 
+.workout-log-stage.market-stage {
+  border-color: #dce8f8;
+  background:
+    radial-gradient(circle at 86% 8%, rgba(10, 102, 216, 0.16), transparent 28%),
+    linear-gradient(180deg, #ffffff 0%, #f5f9ff 52%, #edf5ff 100%);
+  color: #102849;
+  box-shadow: 0 18px 44px rgba(15, 31, 56, 0.12);
+}
+
 .workout-log-stage::before {
   display: none;
   content: none;
@@ -895,22 +904,16 @@ button {
 
 .muscle-visual-card.market-mode {
   display: grid;
-  background: #050a18;
+  border-color: #d7e3f3;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 16px 34px rgba(15, 31, 56, 0.08);
 }
 
 .muscle-visual-card.market-mode > * {
   display: block;
-}
-
-.tradingview-widget-container {
-  width: 100%;
-  height: 100%;
-  min-height: 260px;
-}
-
-.tradingview-widget-container__widget {
-  width: 100%;
-  height: 100%;
 }
 
 .chart-control-dock {
@@ -958,21 +961,207 @@ button {
   font-weight: 900;
 }
 
+.market-stage .visual-mode-tabs {
+  border-color: #dbe5f2;
+  background: #eef5ff;
+}
+
+.market-stage .visual-mode-tabs button {
+  color: #5b6776;
+}
+
+.market-stage .visual-mode-tabs button.active {
+  background: #0a66d8;
+  color: #ffffff;
+}
+
+.market-stage .chart-control-dock select {
+  border-color: #dbe5f2;
+  background: #ffffff;
+  color: #102849;
+}
+
+.market-quote-panel {
+  display: grid;
+  min-height: 100%;
+  align-content: center;
+  gap: 24px;
+  padding: 30px;
+  color: #102849;
+}
+
+.market-quote-head {
+  display: grid;
+  gap: 6px;
+}
+
+.market-quote-head span,
+.market-price-card span,
+.market-quote-grid span {
+  color: #697484;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.market-quote-head strong {
+  color: #06172e;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.market-quote-head small {
+  color: #8a96a6;
+  font-weight: 800;
+}
+
+.market-price-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(10, 102, 216, 0.18);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 88% 22%, rgba(89, 160, 255, 0.36), transparent 26%),
+    linear-gradient(135deg, #0a66d8 0%, #1f86ff 52%, #4f6af3 100%);
+  color: #ffffff;
+  padding: 28px;
+  box-shadow: 0 20px 42px rgba(10, 102, 216, 0.22);
+}
+
+.market-price-card div {
+  display: grid;
+  gap: 6px;
+}
+
+.market-price-card strong {
+  font-size: clamp(44px, 8vw, 74px);
+  line-height: 0.98;
+  letter-spacing: 0;
+}
+
+.market-price-card svg {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.market-quote-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.market-quote-grid article {
+  display: grid;
+  gap: 9px;
+  min-height: 98px;
+  border: 1px solid #dfe8f4;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 18px;
+  box-shadow: 0 10px 24px rgba(15, 31, 56, 0.05);
+}
+
+.market-quote-grid strong {
+  overflow: hidden;
+  color: #06172e;
+  font-size: 17px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-quote-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #697484;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.market-stage .workout-log-item,
+.market-stage .workout-log-empty {
+  border-color: #dfe8f4;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 31, 56, 0.05);
+}
+
+.market-stage .workout-empty-icon {
+  background: #eef5ff;
+  color: #0a66d8;
+}
+
+.market-stage .workout-log-empty,
+.market-stage .workout-log-empty p {
+  color: #697484;
+}
+
+.market-stage .workout-log-empty strong,
+.market-stage .workout-log-item strong {
+  color: #102849;
+}
+
+.market-stage .workout-log-item p {
+  color: #697484;
+}
+
+.market-stage .workout-log-item small {
+  color: #3d4856;
+}
+
+.market-stage .add-workout-button {
+  border: 1px solid #d9e0ea;
+  background: #ffffff;
+  color: #0a66d8;
+  box-shadow: 0 14px 30px rgba(15, 31, 56, 0.08);
+}
+
 .insight-chart-card {
   gap: 12px;
   padding: 14px;
 }
 
 .compact-market-chart {
-  height: 240px;
+  min-height: 240px;
   overflow: hidden;
   border: 1px solid #e1e6ee;
   border-radius: 8px;
-  background: #050a18;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
 }
 
-.compact-market-chart .tradingview-widget-container {
-  min-height: 240px;
+.compact-market-chart .market-quote-panel {
+  gap: 16px;
+  padding: 16px;
+}
+
+.compact-market-chart .market-quote-head strong {
+  font-size: 22px;
+}
+
+.compact-market-chart .market-price-card {
+  border-radius: 12px;
+  margin-bottom: 4px;
+  padding: 14px;
+}
+
+.compact-market-chart .market-price-card strong {
+  font-size: 34px;
+}
+
+.compact-market-chart .market-quote-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.compact-market-chart .market-quote-grid article {
+  min-height: 72px;
+  border-radius: 12px;
+  padding: 12px;
 }
 
 .workout-log-list {
@@ -2893,11 +3082,7 @@ button.calendar-day {
 
   .muscle-visual-card.market-mode {
     aspect-ratio: auto;
-    min-height: clamp(470px, 66vh, 620px);
-  }
-
-  .muscle-visual-card.market-mode .tradingview-widget-container {
-    min-height: clamp(470px, 66vh, 620px);
+    min-height: 430px;
   }
 
   .workout-log-item {
@@ -3014,6 +3199,37 @@ button.calendar-day {
     flex: 1;
     min-height: 42px;
     padding: 10px 12px;
+  }
+
+  .market-quote-panel {
+    align-content: start;
+    gap: 18px;
+    padding: 18px;
+  }
+
+  .market-quote-head strong {
+    font-size: 26px;
+  }
+
+  .market-price-card {
+    border-radius: 16px;
+    margin-bottom: 6px;
+    padding: 20px;
+  }
+
+  .market-price-card strong {
+    font-size: clamp(42px, 14vw, 58px);
+  }
+
+  .market-quote-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 2px;
+  }
+
+  .market-quote-grid article {
+    min-height: 82px;
+    padding: 14px;
   }
 
   .activity-session-detail {

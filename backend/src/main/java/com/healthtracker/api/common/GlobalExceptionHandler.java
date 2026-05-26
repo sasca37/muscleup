@@ -1,6 +1,7 @@
 package com.healthtracker.api.common;
 
 import com.healthtracker.api.exercise.service.InvalidExerciseRequestException;
+import com.healthtracker.api.market.service.MarketQuoteException;
 import com.healthtracker.api.user.service.DuplicateUserException;
 import com.healthtracker.api.user.service.InvalidCredentialsException;
 import com.healthtracker.api.user.service.InvalidUserRequestException;
@@ -59,6 +60,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleWorkoutSessionNotFound(WorkoutSessionNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(ApiErrorResponse.of("WORKOUT_SESSION_NOT_FOUND", exception.getMessage()));
+    }
+
+    @ExceptionHandler(MarketQuoteException.class)
+    public ResponseEntity<ApiErrorResponse> handleMarketQuote(MarketQuoteException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+            .body(ApiErrorResponse.of("MARKET_QUOTE_FAILED", exception.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

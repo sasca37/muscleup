@@ -19,7 +19,7 @@ import {
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from './api/client';
 import { LoginGate } from './components/LoginGate';
-import { TradingViewChart } from './components/TradingViewChart';
+import { MarketQuotePanel } from './components/MarketQuotePanel';
 import { muscleGroups } from './data/muscleGroups';
 import { mockMachines } from './data/mockMachines';
 import type {
@@ -105,13 +105,11 @@ const priorityGroupOptions: { value: MuscleGroup; label: string }[] = [
   { value: 'CORE', label: '복근' },
 ];
 const marketSymbolOptions = [
-  { value: 'NASDAQ:INTC', label: '인텔' },
-  { value: 'NASDAQ:AMD', label: 'AMD' },
-  { value: 'NASDAQ:ARM', label: 'ARM' },
-  { value: 'NASDAQ:MU', label: '마이크론' },
-  { value: 'KRX:005930', label: '삼성전자' },
-  { value: 'KRX:000660', label: '하이닉스' },
-  { value: 'NASDAQ:SNDK', label: '샌디스크' },
+  { value: 'INTC', label: '인텔' },
+  { value: 'AMD', label: 'AMD' },
+  { value: 'ARM', label: 'ARM' },
+  { value: 'MU', label: '마이크론' },
+  { value: 'SNDK', label: '샌디스크' },
 ];
 const weekLabels = ['월', '화', '수', '목', '금', '토', '일'];
 const splitTemplates: Record<SplitType, { title: string; groups: MuscleGroup[] }[]> = {
@@ -353,7 +351,7 @@ export function App() {
   const [summarySessionId, setSummarySessionId] = useState<string | null>(null);
   const [selectedActivityDate, setSelectedActivityDate] = useState(today);
   const [recordVisualMode, setRecordVisualMode] = useState<RecordVisualMode>('market');
-  const [marketSymbol, setMarketSymbol] = useState('NASDAQ:INTC');
+  const [marketSymbol, setMarketSymbol] = useState('INTC');
   const [restDurationSeconds, setRestDurationSeconds] = useState(() => {
     const storedValue = Number(window.localStorage.getItem(restDurationKey));
     return storedValue >= minRestSeconds && storedValue <= maxRestSeconds
@@ -1357,7 +1355,13 @@ export function App() {
               </div>
             </div>
 
-            <section className={workoutStartedAt == null ? 'workout-log-stage' : 'workout-log-stage active'}>
+            <section
+              className={[
+                'workout-log-stage',
+                workoutStartedAt == null ? '' : 'active',
+                recordVisualMode === 'market' ? 'market-stage' : '',
+              ].filter(Boolean).join(' ')}
+            >
               <div className="chart-control-dock">
                 <div className="visual-mode-tabs" aria-label="운동 카드 보기 방식">
                   <button
@@ -1388,7 +1392,7 @@ export function App() {
                 className={recordVisualMode === 'market' ? 'muscle-visual-card market-mode' : 'muscle-visual-card'}
                 aria-label={recordVisualMode === 'market' ? '운동 중 주식 차트' : '오늘 운동 부위 비주얼'}
               >
-                {recordVisualMode === 'market' && <TradingViewChart symbol={marketSymbol} />}
+                {recordVisualMode === 'market' && <MarketQuotePanel symbol={marketSymbol} />}
               </div>
 
               <div className="workout-log-list">
@@ -1739,10 +1743,10 @@ export function App() {
                     <div className="insight-card insight-chart-card">
                       <div className="panel-title">
                         <Activity size={18} />
-                        <h3>운동 중 차트</h3>
+                        <h3>운동 중 현재가</h3>
                       </div>
                       <div className="compact-market-chart">
-                        <TradingViewChart symbol={marketSymbol} />
+                        <MarketQuotePanel symbol={marketSymbol} />
                       </div>
                     </div>
 

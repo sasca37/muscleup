@@ -1,6 +1,8 @@
 spring:
   application:
     name: health-tracker-api
+  config:
+    import: optional:file:.env[.properties]
   profiles:
     default: local
   data:
@@ -10,6 +12,13 @@ spring:
 
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
+
+kis:
+  base-url: ${KIS_BASE_URL:https://openapi.koreainvestment.com:9443}
+  app-key: ${KIS_APP_KEY:}
+  app-secret: ${KIS_APP_SECRET:}
+  price-detail-tr-id: ${KIS_PRICE_DETAIL_TR_ID:HHDFS76200200}
+  token-refresh-buffer-seconds: ${KIS_TOKEN_REFRESH_BUFFER_SECONDS:300}
 
 server:
   port: ${PORT:8080}

@@ -3,6 +3,7 @@ import type {
   CreateCustomExercisePayload,
   ExerciseMachine,
   LoginPayload,
+  MarketQuote,
   MuscleGroup,
   RegisterPayload,
   StartWorkoutSessionPayload,
@@ -118,5 +119,8 @@ export const api = {
     return request<void>(`/api/workout-sessions/${sessionId}`, withUser(userId, {
       method: 'DELETE',
     }));
+  },
+  getUsStockQuote(symbol: string) {
+    return request<MarketQuote>(`/api/market/us-stocks/${encodeURIComponent(symbol)}`);
   },
 };
