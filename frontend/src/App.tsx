@@ -523,6 +523,7 @@ export function App() {
   const [customMovementPattern, setCustomMovementPattern] = useState('');
   const [customExerciseDescription, setCustomExerciseDescription] = useState('');
   const [customExerciseSaving, setCustomExerciseSaving] = useState(false);
+  const [finishConfirmOpen, setFinishConfirmOpen] = useState(false);
   const [summarySessionId, setSummarySessionId] = useState<string | null>(initialRoute.summarySessionId);
   const [selectedActivityDate, setSelectedActivityDate] = useState(today);
   const [recordVisualMode, setRecordVisualMode] = useState<RecordVisualMode>('market');
@@ -1019,6 +1020,7 @@ export function App() {
   }
 
   async function finishWorkout() {
+    setFinishConfirmOpen(false);
     let nextSummarySessionId = activeSessionId;
     const sessionToFinish = activeSessionId
       ? sessions.find((session) => session.id === activeSessionId)
@@ -1077,6 +1079,14 @@ export function App() {
     setSelectedMachineId(null);
     setExerciseFormOpen(false);
     setExercisePickerOpen(true);
+    navigateToView('record');
+  }
+
+  function requestFinishWorkout() {
+    setError(null);
+    setFinishConfirmOpen(true);
+    setExercisePickerOpen(false);
+    setExerciseFormOpen(false);
     navigateToView('record');
   }
 
@@ -1381,6 +1391,7 @@ export function App() {
     setExercisePickerOpen(false);
     setExerciseFormOpen(false);
     setCustomExerciseOpen(false);
+    setFinishConfirmOpen(false);
     setSummarySessionId(null);
     setSessions([]);
     setFavoriteMachineIds(new Set());
@@ -1568,7 +1579,7 @@ export function App() {
                       <Plus size={16} />
                       기록 추가
                     </button>
-                    <button className="primary-button" type="button" onClick={finishWorkout}>
+                    <button className="primary-button" type="button" onClick={requestFinishWorkout}>
                       <CheckCircle2 size={16} />
                       운동 종료
                     </button>
@@ -1780,7 +1791,7 @@ export function App() {
                 <button
                   className={workoutStartedAt == null ? 'session-timer-button' : 'session-timer-button running'}
                   type="button"
-                  onClick={workoutStartedAt == null ? startWorkout : finishWorkout}
+                  onClick={workoutStartedAt == null ? startWorkout : requestFinishWorkout}
                 >
                   {workoutStartedAt == null ? <Timer size={18} /> : <CheckCircle2 size={18} />}
                   <span>{workoutStartedAt == null ? '운동 시작' : formatSeconds(workoutElapsedSeconds)}</span>
@@ -1875,7 +1886,7 @@ export function App() {
                     시작
                   </button>
                 ) : (
-                  <button className="start-workout-button" type="button" onClick={finishWorkout}>
+                  <button className="start-workout-button" type="button" onClick={requestFinishWorkout}>
                     <CheckCircle2 size={20} />
                     종료
                   </button>
@@ -2242,6 +2253,44 @@ export function App() {
                 </section>
                 )}
               </section>
+              </div>
+            )}
+
+            {finishConfirmOpen && (
+              <div className="finish-confirm-backdrop" role="presentation">
+                <section className="finish-confirm-dialog" role="dialog" aria-modal="true" aria-label="운동 종료 확인">
+                  <div className="finish-confirm-icon">
+                    <CheckCircle2 size={28} />
+                  </div>
+                  <div>
+                    <span>운동 종료</span>
+                    <h2>오늘 운동을 종료할까요?</h2>
+                    <p>종료하면 현재 세션이 완료 처리되고 운동 완료 리포트로 이동합니다.</p>
+                  </div>
+                  <div className="finish-confirm-stats">
+                    <article>
+                      <strong>{visibleWorkoutRecords.length}</strong>
+                      <span>운동</span>
+                    </article>
+                    <article>
+                      <strong>{visibleWorkoutSetCount}</strong>
+                      <span>세트</span>
+                    </article>
+                    <article>
+                      <strong>{formatSeconds(workoutElapsedSeconds)}</strong>
+                      <span>시간</span>
+                    </article>
+                  </div>
+                  <div className="finish-confirm-actions">
+                    <button className="secondary-button" type="button" onClick={() => setFinishConfirmOpen(false)}>
+                      계속 기록하기
+                    </button>
+                    <button className="primary-button" type="button" onClick={finishWorkout}>
+                      <CheckCircle2 size={16} />
+                      종료하기
+                    </button>
+                  </div>
+                </section>
               </div>
             )}
           </section>

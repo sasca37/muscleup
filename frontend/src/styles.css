@@ -1370,6 +1370,93 @@ button {
   box-shadow: 0 34px 90px rgba(0, 0, 0, 0.36);
 }
 
+.finish-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  background: rgba(3, 8, 20, 0.58);
+  padding: 22px;
+  backdrop-filter: blur(10px);
+}
+
+.finish-confirm-dialog {
+  display: grid;
+  width: min(420px, 100%);
+  gap: 16px;
+  border: 1px solid #dbe8f8;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 22px;
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.28);
+}
+
+.finish-confirm-icon {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border-radius: 14px;
+  background: #f1f6ff;
+  color: #0a66d8;
+}
+
+.finish-confirm-dialog span {
+  color: #0a66d8;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.finish-confirm-dialog h2 {
+  margin: 5px 0 7px;
+  color: #06172e;
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.finish-confirm-dialog p {
+  margin: 0;
+  color: #697484;
+  line-height: 1.55;
+}
+
+.finish-confirm-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.finish-confirm-stats article {
+  display: grid;
+  gap: 5px;
+  border: 1px solid #e1e8f5;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 12px;
+  text-align: center;
+}
+
+.finish-confirm-stats strong {
+  overflow: hidden;
+  color: #102849;
+  font-size: 20px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finish-confirm-stats span {
+  color: #697484;
+  font-size: 12px;
+}
+
+.finish-confirm-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
 .section-heading.compact {
   margin-bottom: 0;
 }
@@ -3601,6 +3688,21 @@ button.calendar-day {
     max-height: calc(100dvh - 18px);
     border-radius: 22px 22px 0 0;
     padding: 16px 14px calc(18px + env(safe-area-inset-bottom));
+  }
+
+  .finish-confirm-backdrop {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .finish-confirm-dialog {
+    width: 100%;
+    border-radius: 18px 18px 0 0;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+  }
+
+  .finish-confirm-actions {
+    grid-template-columns: 1fr;
   }
 
   .active-workout-strip {
