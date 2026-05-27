@@ -246,21 +246,6 @@ function formatSeconds(seconds: number) {
   return `${minutes}:${String(restSeconds).padStart(2, '0')}`;
 }
 
-function formatDuration(seconds: number) {
-  if (seconds < 60) {
-    return `${seconds}초`;
-  }
-
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-
-  if (hours > 0) {
-    return `${hours}시간 ${minutes}분`;
-  }
-
-  return `${minutes}분`;
-}
-
 function formatDateKey(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -821,21 +806,7 @@ export function App() {
   const activeWorkoutSetCount = activeWorkoutRecords.reduce((total, record) => total + record.setsCount, 0);
   const trainedDateSet = new Set(sessions.map((session) => session.workoutDate));
   const todaysSessions = sessions.filter((session) => session.workoutDate === today);
-  const todaysWorkoutRecords: ActiveWorkoutRecord[] = todaysSessions.flatMap((session) =>
-    session.records.map((record) => ({
-      id: record.id,
-      sessionId: session.id,
-      machineName: record.machineName,
-      muscleGroupLabel: record.muscleGroupLabel,
-      setsCount: record.sets.length,
-      sets: record.sets.map((set) => ({
-        weightKg: set.weightKg,
-        reps: set.reps,
-      })),
-      workoutDate: session.workoutDate,
-    })),
-  );
-  const visibleWorkoutRecords = workoutStartedAt == null ? todaysWorkoutRecords : activeWorkoutRecords;
+  const visibleWorkoutRecords = workoutStartedAt == null ? [] : activeWorkoutRecords;
   const visibleWorkoutParts = Array.from(new Set(visibleWorkoutRecords.map((record) => record.muscleGroupLabel)));
   const visibleWorkoutSetCount = visibleWorkoutRecords.reduce((total, record) => total + record.setsCount, 0);
   const favoriteMachines = exerciseMachines.filter((machine) => favoriteMachineIds.has(machine.id));
@@ -905,6 +876,17 @@ export function App() {
       })
       .map((session) => session.workoutDate),
   );
+  const calendarDateSessionCountMap = sessions.reduce<Record<string, number>>((countsByDate, session) => {
+    const sessionDate = new Date(`${session.workoutDate}T00:00:00`);
+    if (sessionDate.getFullYear() !== calendarYear || sessionDate.getMonth() !== calendarMonth) {
+      return countsByDate;
+    }
+
+    return {
+      ...countsByDate,
+      [session.workoutDate]: (countsByDate[session.workoutDate] ?? 0) + 1,
+    };
+  }, {});
   const calendarCells: Array<{ day: number; dateKey: string } | null> = [
     ...Array.from({ length: calendarStartOffset }, () => null),
     ...Array.from({ length: calendarMonthLength }, (_, index) => {
@@ -1297,10 +1279,21 @@ export function App() {
       0,
     );
     const durationMinutes = session.durationSeconds ? Math.max(1, Math.round(session.durationSeconds / 60)) : 0;
-    const shareRecords = session.records.slice(0, 6);
+    const shareRecords = session.records;
+    const shareRecordRows = [];
+    for (let index = 0; index < shareRecords.length; index += 2) {
+      const rowRecords = shareRecords.slice(index, index + 2);
+      const rowHeight = rowRecords.reduce((height, record) => {
+        const setRows = Math.max(1, Math.ceil(record.sets.length / 4));
+        const setStartOffset = record.note ? 118 : 94;
+        return Math.max(height, Math.max(176, setStartOffset + setRows * 44 + 20));
+      }, 176);
+      shareRecordRows.push({ records: rowRecords, height: rowHeight });
+    }
+    const shareContentHeight = shareRecordRows.reduce((total, row) => total + row.height, 0);
     const canvas = document.createElement('canvas');
     canvas.width = 1080;
-    canvas.height = 1080;
+    canvas.height = Math.max(1080, 296 + shareContentHeight + 72);
     const context = canvas.getContext('2d');
 
     if (!context) {
@@ -1324,14 +1317,13 @@ export function App() {
     context.font = '900 38px Arial, sans-serif';
     context.fillText(getShareWorkoutTitle(stats.parts), 46, 104);
 
-    drawRoundedRect(context, 974, 28, 60, 60, 14);
+    drawRoundedRect(context, 936, 28, 98, 48, 14);
     context.fillStyle = '#ffffff';
     context.fill();
     context.fillStyle = '#3f7df6';
     context.font = '900 18px Arial, sans-serif';
     context.textAlign = 'center';
-    context.fillText('REP', 1004, 58);
-    context.fillText('ICK', 1004, 78);
+    context.fillText('Repick', 985, 59);
 
     const metrics = [
       [`${durationMinutes || '-'}분`, 'clock'],
@@ -1356,8 +1348,9 @@ export function App() {
     });
 
     let rowY = 296;
-    for (let index = 0; index < shareRecords.length; index += 2) {
-      if (index > 0) {
+    for (let rowIndex = 0; rowIndex < shareRecordRows.length; rowIndex++) {
+      const row = shareRecordRows[rowIndex];
+      if (rowIndex > 0) {
         context.strokeStyle = '#eef1f6';
         context.lineWidth = 2;
         context.beginPath();
@@ -1366,12 +1359,8 @@ export function App() {
         context.stroke();
       }
 
-      for (let column = 0; column < 2; column++) {
-        const record = shareRecords[index + column];
-        if (!record) {
-          continue;
-        }
-
+      for (let column = 0; column < row.records.length; column++) {
+        const record = row.records[column];
         const x = column === 0 ? 46 : 560;
         const assetUrl = getExerciseAssetUrl(record.machineName);
         if (assetUrl) {
@@ -1402,25 +1391,30 @@ export function App() {
           drawWrappedText(context, record.note, x + 112, rowY + 82, 350, 22, 1);
         }
 
-        record.sets.slice(0, 4).forEach((set, setIndex) => {
-          const setX = x + setIndex * 88;
-          drawRoundedRect(context, setX, rowY + 118, 76, 34, 17);
-          context.fillStyle = '#e8f2ff';
+        const setStartY = record.note ? rowY + 118 : rowY + 94;
+        record.sets.forEach((set, setIndex) => {
+          const setX = x + (setIndex % 4) * 84;
+          const setY = setStartY + Math.floor(setIndex / 4) * 56;
+          drawRoundedRect(context, setX, setY, 64, 40, 20);
+          context.fillStyle = '#0a66d8';
           context.fill();
-          context.fillStyle = '#3f7df6';
+          context.fillStyle = '#ffffff';
           context.textAlign = 'center';
-          context.font = '900 18px Arial, sans-serif';
-          context.fillText(`${set.weightKg} x ${set.reps}`, setX + 38, rowY + 141);
+          context.font = '900 24px Arial, sans-serif';
+          context.fillText(String(set.weightKg), setX + 32, setY + 28);
+          context.fillStyle = '#697484';
+          context.font = '900 16px Arial, sans-serif';
+          context.fillText(`${set.reps}X`, setX + 32, setY + 58);
         });
       }
 
-      rowY += 220;
+      rowY += row.height;
     }
 
     context.textAlign = 'center';
     context.fillStyle = '#a4afbd';
     context.font = '800 18px Arial, sans-serif';
-    context.fillText('오늘 한 세트가 다음 운동의 기준이 되게 · Repick', 540, 1040);
+    context.fillText('오늘 한 세트가 다음 운동의 기준이 되게 · Repick', 540, canvas.height - 40);
 
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
     if (!blob) {
@@ -1431,7 +1425,6 @@ export function App() {
     if (navigator.canShare?.({ files: [file] })) {
       await navigator.share({
         files: [file],
-        title: 'Repick 운동 기록',
       });
       return;
     }
@@ -1692,7 +1685,7 @@ export function App() {
               </button>
               <button type="button" onClick={() => navigateToView('activity')}>
                 <strong>내 활동 보기</strong>
-                <span>저장된 세션을 카드 형태로 훑어봅니다.</span>
+                <span>캘린더와 날짜별 세션 상세를 확인합니다.</span>
               </button>
             </div>
           </section>
@@ -2485,7 +2478,7 @@ export function App() {
                 </div>
 
                 <div className="summary-story-records">
-                  {summarySession.records.slice(0, 6).map((record) => (
+                  {summarySession.records.map((record) => (
                     <article className="summary-story-record" key={record.id}>
                       <span
                         className="summary-story-record-image"
@@ -2502,9 +2495,10 @@ export function App() {
                         <span>{Math.round(getWorkoutRecordVolume(record)).toLocaleString()} kg</span>
                         {record.note && <p className="summary-story-note">{record.note}</p>}
                         <div className="summary-story-set-row">
-                          {record.sets.slice(0, 4).map((set, index) => (
+                          {record.sets.map((set, index) => (
                             <span className="summary-story-set" key={`${record.id}-${index}`}>
-                              <strong>{set.weightKg} x {set.reps}</strong>
+                              <strong>{set.weightKg}</strong>
+                              <small>{set.reps}X</small>
                             </span>
                           ))}
                         </div>
@@ -2571,7 +2565,9 @@ export function App() {
                     {cell && (
                       <>
                         <span>{cell.day}</span>
-                        {calendarTrainedDateSet.has(cell.dateKey) && <small />}
+                        {calendarTrainedDateSet.has(cell.dateKey) && (
+                          <small>{calendarDateSessionCountMap[cell.dateKey] ?? 1}</small>
+                        )}
                       </>
                     )}
                   </button>
@@ -2628,34 +2624,6 @@ export function App() {
             })}
           </section>
 
-          <div className="session-gallery">
-            {sessions.length === 0 && (
-              <article className="session-tile empty-tile">
-                <CalendarDays size={28} />
-                <strong>아직 저장된 세션이 없습니다.</strong>
-                <span>첫 기록을 저장하면 최근 세션 카드가 만들어집니다.</span>
-              </article>
-            )}
-            {sessions.slice(0, 6).map((session) => (
-              <button
-                className="session-tile"
-                key={session.id}
-                type="button"
-                onClick={() => {
-                  navigateToView('summary', session.id);
-                }}
-              >
-                <div className="tile-overlay">
-                  <span>{session.workoutDate}</span>
-                  <strong>{session.records.map((record) => record.machineName).join(', ')}</strong>
-                  <small>
-                    {session.durationSeconds ? formatDuration(session.durationSeconds) : '기록 세션'} ·{' '}
-                    {session.records.map((record) => record.muscleGroupLabel).join(', ')}
-                  </small>
-                </div>
-              </button>
-            ))}
-          </div>
         </section>
         )}
       </section>
