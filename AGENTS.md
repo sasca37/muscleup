@@ -204,11 +204,13 @@ mongo_connection_tests
 운동 완료 요약:
 
 - 운동 종료 후 `/summary/:sessionId` 화면에서 완료 요약을 보여준다.
-- 요약 화면은 Repick 색상에 맞춰 흰색/파란색 기반의 공유 카드 형태로 구성했다.
+- 요약 화면은 파스텔 헤더와 2열 운동 리스트 기반의 간결한 공유 카드 형태로 구성했다.
 - 요약에는 운동 수, 세트 수, 반복 수, 총 볼륨, 운동 시간, kg/min 강도, 운동별 세트 정보가 표시된다.
 - 운동별 대표 이미지는 `getExerciseAssetUrl(name)` 매핑으로 `frontend/public/exercises/` 에셋을 사용한다.
-- 공유 버튼은 Canvas로 1080x1920 PNG 이미지를 생성한다.
+- 공유 버튼은 Canvas로 1080x1080 PNG 이미지를 생성한다.
 - Web Share API를 지원하는 환경에서는 이미지 공유를 시도하고, 미지원 환경에서는 PNG 다운로드로 fallback 한다.
+- 운동별 메모가 있으면 완료 요약 카드와 공유 이미지에 함께 표시한다.
+- 완료 요약 화면은 공유 카드 중심으로 간결하게 유지하고, 별도 TOP 랭킹/히스토리 목록은 표시하지 않는다.
 
 ## 주식 현재가 기능
 
@@ -249,10 +251,10 @@ GET /api/market/watchlist/quotes
 
 동작:
 
-- KIS OAuth token은 DB나 파일이 아니라 Spring Boot 서버 메모리에만 캐싱한다.
-- `KisAccessTokenProvider`의 `cachedAccessToken` 필드에 저장한다.
-- 토큰이 없거나 만료 5분 전이면 `/oauth2/tokenP`로 재발급한다.
-- 서버 재시작/Render sleep 이후에는 다음 조회 때 새로 발급한다.
+- KIS OAuth token은 `kis_access_tokens` 컬렉션에 캐싱한다.
+- `KisAccessTokenProvider`는 app key 기반 cache id로 DB 캐시를 먼저 조회한다.
+- 토큰이 없거나 만료 5분 전이면 `/oauth2/tokenP`로 재발급한 뒤 DB에 저장한다.
+- 서버 재시작/Render sleep 이후에도 DB 캐시가 유효하면 재사용한다.
 - KIS 현재가 응답 중 `output.last` 값을 현재가로 사용하고, `output.base`를 전일종가로 내려준다.
 - 프론트는 `last`와 `base`를 기준으로 등락률을 계산한다.
 - 현재가는 `$` 단위와 소수점 둘째 자리까지 표시한다.
@@ -286,9 +288,10 @@ KIS_PRICE_DETAIL_TR_ID=HHDFS76200200
 - `backend/.env.example`에는 placeholder만 둔다.
 - `application.yml`은 `optional:file:.env[.properties]`로 로컬 `.env`를 읽는다.
 - 삼성전자/하이닉스는 아직 빠져 있다. 국내주식 API를 별도로 붙여야 한다.
-- 다음 작업으로 KIS access token 캐시를 서버 메모리에서 MongoDB로 옮길 예정이다.
-- DB 캐시 전환 시 `kis_access_tokens` 같은 컬렉션을 만들고, app key 기반 cache id, access token, expiresAt, updatedAt을 저장하는 방식이 적합하다.
-- 여러 서버/로컬 환경에서 동시에 토큰을 발급받는 문제를 줄이려면 `KisAccessTokenProvider`가 먼저 DB 캐시를 조회하고, 없거나 만료 임박일 때만 `/oauth2/tokenP`를 호출하게 바꾼다.
+- KIS access token 캐시는 서버 메모리에서 MongoDB로 전환했다.
+- `kis_access_tokens` 컬렉션에는 app key 기반 cache id, access token, expiresAt, updatedAt을 저장한다.
+- `expiresAt`, `updatedAt`은 서버 타임존 차이를 피하기 위해 Instant 기준으로 저장한다.
+- 여러 서버/로컬 환경에서 동시에 토큰을 발급받는 문제를 줄이기 위해 `KisAccessTokenProvider`가 먼저 DB 캐시를 조회하고, 없거나 만료 임박일 때만 `/oauth2/tokenP`를 호출한다.
 
 ## 운동 이미지 에셋
 
@@ -401,7 +404,7 @@ VITE_APP_BASE_URL=http://localhost:5173
 - 프론트의 운동 시작, 운동 추가, 운동 종료 흐름은 운동 세션 API와 연결되었다.
 - 백엔드 호출이 실패하면 운동 화면은 로컬 세션 fallback으로 계속 동작한다.
 - 즐겨찾기 운동은 아직 백엔드 저장이 아니라 localStorage 기반이다.
-- 주식 관심 종목은 백엔드 MongoDB에 저장하지만, KIS access token은 아직 서버 메모리 캐시다.
+- 주식 관심 종목과 KIS access token 캐시는 백엔드 MongoDB에 저장한다.
 - 프론트 화면 라우팅은 History API 직접 구현이므로, 화면 추가 시 `parseAppRoute()`, `getAppRoutePath()`, `navigateToView()`를 함께 확인해야 한다.
 
 ## 다음 세션 인수인계 메모
@@ -417,22 +420,23 @@ VITE_APP_BASE_URL=http://localhost:5173
 - 관심 종목 추가/삭제 후 다른 종목 현재가가 초기화되거나 호출 대상에서 빠지는 문제를 보완했다.
 - KIS `EXCD`를 한국시간 기준 데이장/정규장에는 `NAS`, 그 외에는 `BAQ`로 선택하도록 수정했다.
 - 주식 목록에 조회 시각과 사용한 `EXCD`를 작게 표시했다.
-- 운동 완료 요약 화면을 Repick 흰색/파란색 스타일의 공유 카드로 개편했다.
-- 공유 버튼으로 1080x1920 PNG 이미지를 생성하고 Web Share API 또는 다운로드 fallback을 사용하도록 했다.
+- 운동 완료 요약 화면을 파스텔 헤더와 2열 운동 리스트 중심의 간결한 오운완 공유 카드로 개편했다.
+- 공유 버튼으로 1080x1080 PNG 이미지를 생성하고 Web Share API 또는 다운로드 fallback을 사용하도록 했다.
+- 운동 완료 요약에 운동별 메모를 표시하고, TOP 랭킹/하단 히스토리 영역을 제거했다.
 - 운동 종료 버튼에 확인 팝업을 추가했다.
 - 화면 이동에 URL 라우팅을 추가하고 뒤로가기를 지원하도록 했다.
+- KIS access token 캐시를 서버 메모리에서 MongoDB `kis_access_tokens` 컬렉션으로 전환했다.
 
 다음 창에서 바로 이어서 할 만한 작업:
 
-1. KIS access token 캐시를 서버 메모리에서 MongoDB로 옮긴다.
-2. `KisAccessTokenProvider`에 DB 캐시 조회/저장 로직을 추가한다.
-3. `kis_access_tokens` 컬렉션용 `@Document`와 `MongoRepository`를 만든다.
-4. 토큰 만료 5분 전에는 기존처럼 재발급하되, 여러 실행 환경이 같은 DB 캐시를 공유하게 한다.
-5. 구현 후 `cd backend && ./gradlew test`를 실행한다.
+1. 백엔드 배포 대상(Render/Railway/Fly.io 등)을 확정한다.
+2. 배포 환경에 `MONGODB_URI`, `KIS_APP_KEY`, `KIS_APP_SECRET`을 설정한다.
+3. 프론트 배포 환경의 `VITE_API_BASE_URL`을 실제 백엔드 URL로 연결한다.
+4. 실제 배포 환경에서 KIS 현재가와 운동 기록 API를 점검한다.
 
 검증 상황:
 
 - 최근 프론트 변경 후 `npm --prefix frontend run build` 성공.
 - 최근 백엔드 주식 기능 변경 후 `cd backend && ./gradlew test` 성공.
-- AGENTS.md 정리 자체는 문서 변경이라 별도 빌드/테스트를 실행하지 않았다.
+- KIS access token MongoDB 캐시 전환 후 `cd backend && ./gradlew test` 성공.
 - 소셜 로그인과 이메일 인증은 추후 기능이다.
