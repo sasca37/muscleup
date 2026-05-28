@@ -1280,13 +1280,17 @@ export function App() {
     );
     const durationMinutes = session.durationSeconds ? Math.max(1, Math.round(session.durationSeconds / 60)) : 0;
     const shareRecords = session.records;
+    const shareSetColumns = 4;
+    const shareSetRowGap = 76;
+    const shareSetBlockBottomPadding = 112;
     const shareRecordRows = [];
     for (let index = 0; index < shareRecords.length; index += 2) {
       const rowRecords = shareRecords.slice(index, index + 2);
       const rowHeight = rowRecords.reduce((height, record) => {
-        const setRows = Math.max(1, Math.ceil(record.sets.length / 4));
+        const setRows = Math.max(1, Math.ceil(record.sets.length / shareSetColumns));
         const setStartOffset = record.note ? 118 : 94;
-        return Math.max(height, Math.max(176, setStartOffset + setRows * 44 + 20));
+        const setBlockHeight = setStartOffset + (setRows - 1) * shareSetRowGap + shareSetBlockBottomPadding;
+        return Math.max(height, Math.max(176, setBlockHeight));
       }, 176);
       shareRecordRows.push({ records: rowRecords, height: rowHeight });
     }
@@ -1393,8 +1397,8 @@ export function App() {
 
         const setStartY = record.note ? rowY + 118 : rowY + 94;
         record.sets.forEach((set, setIndex) => {
-          const setX = x + (setIndex % 4) * 84;
-          const setY = setStartY + Math.floor(setIndex / 4) * 56;
+          const setX = x + (setIndex % shareSetColumns) * 84;
+          const setY = setStartY + Math.floor(setIndex / shareSetColumns) * shareSetRowGap;
           drawRoundedRect(context, setX, setY, 64, 40, 20);
           context.fillStyle = '#0a66d8';
           context.fill();
