@@ -14,7 +14,6 @@ import {
   Share2,
   Star,
   Timer,
-  Trophy,
   Trash2,
   UserRound,
 } from 'lucide-react';
@@ -38,7 +37,6 @@ type DraftSet = {
   weightKg: string;
   reps: string;
   completed: boolean;
-  remainingSeconds: number;
 };
 
 type ActiveView = 'home' | 'planner' | 'record' | 'oneRm' | 'activity' | 'summary';
@@ -75,11 +73,11 @@ type AppRoute = {
   summarySessionId: string | null;
 };
 
-const today = new Date().toISOString().slice(0, 10);
 const mockSessionKey = 'repick-mock-session';
 const legacyMockSessionKey = 'muscle-log-mock-session';
 const restDurationKey = 'repick-rest-duration';
 const favoriteExercisesKeyPrefix = 'repick-favorite-exercises';
+const routinePlannerEnabled = import.meta.env.VITE_ENABLE_ROUTINE_PLANNER === 'true';
 const defaultRestSeconds = 60;
 const minRestSeconds = 10;
 const maxRestSeconds = 300;
@@ -149,7 +147,7 @@ function parseAppRoute(): AppRoute {
     };
   }
 
-  if (path === '/planner') {
+  if (path === '/planner' && routinePlannerEnabled) {
     return { view: 'planner', summarySessionId: null };
   }
 
@@ -198,7 +196,6 @@ function createDraftSet(): DraftSet {
     weightKg: '',
     reps: '',
     completed: false,
-    remainingSeconds: 0,
   };
 }
 
@@ -208,36 +205,6 @@ function createDraftSetFromHistory(set?: WorkoutSet): DraftSet {
     weightKg: set?.weightKg == null ? '' : String(set.weightKg),
     reps: set?.reps == null ? '' : String(set.reps),
   };
-}
-
-function formatPreviousSet(set?: WorkoutSet, draftSet?: DraftSet) {
-  if (!set) {
-    return null;
-  }
-
-  const previousWeight = Number(set.weightKg);
-  const currentWeight = Number(draftSet?.weightKg);
-  const currentReps = Number(draftSet?.reps);
-  const changes: string[] = [];
-
-  if (Number.isFinite(previousWeight) && Number.isFinite(currentWeight) && draftSet?.weightKg !== '') {
-    const weightDiff = currentWeight - previousWeight;
-    if (weightDiff !== 0) {
-      changes.push(`${weightDiff > 0 ? '+' : ''}${weightDiff}kg`);
-    }
-  }
-
-  if (Number.isFinite(currentReps) && draftSet?.reps !== '') {
-    const repsDiff = currentReps - set.reps;
-    if (repsDiff !== 0) {
-      changes.push(`${repsDiff > 0 ? '+' : ''}${repsDiff}회`);
-    }
-  }
-
-  const comparison = changes.length > 0 ? changes.join(' / ') : draftSet?.weightKg || draftSet?.reps ? '지난과 동일' : null;
-  return comparison
-    ? `지난 ${set.weightKg}kg x ${set.reps}회 · ${comparison}`
-    : `지난 ${set.weightKg}kg x ${set.reps}회`;
 }
 
 function formatSeconds(seconds: number) {
@@ -251,6 +218,10 @@ function formatDateKey(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function getTodayDateKey() {
+  return formatDateKey(new Date());
 }
 
 function formatWorkoutDateLabel(dateKey: string) {
@@ -529,6 +500,7 @@ function getPrescription(goal: TrainingGoal, level: TrainingLevel) {
 
 export function App() {
   const initialRoute = useMemo(parseAppRoute, []);
+  const todayDateKey = getTodayDateKey();
   const [user, setUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [activeView, setActiveView] = useState<ActiveView>(initialRoute.view);
@@ -536,7 +508,7 @@ export function App() {
   const [selectedGroup, setSelectedGroup] = useState<MuscleGroup>('CHEST');
   const [selectedMachineId, setSelectedMachineId] = useState<number | null>(null);
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
-  const [workoutDate, setWorkoutDate] = useState(today);
+  const [workoutDate, setWorkoutDate] = useState(todayDateKey);
   const [memo, setMemo] = useState('');
   const [note, setNote] = useState('');
   const [oneRmLift, setOneRmLift] = useState<OneRmLift>('squat');
@@ -561,9 +533,12 @@ export function App() {
   const [customExerciseSaving, setCustomExerciseSaving] = useState(false);
   const [finishConfirmOpen, setFinishConfirmOpen] = useState(false);
   const [summarySessionId, setSummarySessionId] = useState<string | null>(initialRoute.summarySessionId);
-  const [selectedActivityDate, setSelectedActivityDate] = useState(today);
-  const [recordVisualMode, setRecordVisualMode] = useState<RecordVisualMode>('market');
+  const [selectedActivityDate, setSelectedActivityDate] = useState(todayDateKey);
+  const [recordVisualMode, setRecordVisualMode] = useState<RecordVisualMode>('body');
   const [favoriteMachineIds, setFavoriteMachineIds] = useState<Set<number>>(() => new Set());
+  const [restRemainingSeconds, setRestRemainingSeconds] = useState(0);
+  const [restAlertOpen, setRestAlertOpen] = useState(false);
+  const [lastCompletedSetNumber, setLastCompletedSetNumber] = useState<number | null>(null);
   const [restDurationSeconds, setRestDurationSeconds] = useState(() => {
     const storedValue = Number(window.localStorage.getItem(restDurationKey));
     return storedValue >= minRestSeconds && storedValue <= maxRestSeconds
@@ -666,7 +641,7 @@ export function App() {
 
         setSessions(loadedSessions);
         const inProgressSession = loadedSessions.find(
-          (session) => session.status === 'IN_PROGRESS' && session.workoutDate === today,
+          (session) => session.status === 'IN_PROGRESS' && session.workoutDate === todayDateKey,
         );
 
         if (inProgressSession) {
@@ -702,23 +677,29 @@ export function App() {
   }, [exerciseMachines]);
 
   useEffect(() => {
-    const hasRunningTimer = sets.some((set) => set.completed && set.remainingSeconds > 0);
-    if (!hasRunningTimer) {
+    if (restRemainingSeconds <= 0) {
       return;
     }
 
     const intervalId = window.setInterval(() => {
-      setSets((current) =>
-        current.map((set) =>
-          set.completed && set.remainingSeconds > 0
-            ? { ...set, remainingSeconds: Math.max(0, set.remainingSeconds - 1) }
-            : set,
-        ),
-      );
+      setRestRemainingSeconds((current) => {
+        if (current <= 1) {
+          setRestAlertOpen(true);
+          return 0;
+        }
+
+        return current - 1;
+      });
     }, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [sets]);
+  }, [restRemainingSeconds]);
+
+  useEffect(() => {
+    if (restAlertOpen && 'vibrate' in navigator) {
+      navigator.vibrate([120, 80, 120]);
+    }
+  }, [restAlertOpen]);
 
   useEffect(() => {
     if (workoutStartedAt == null) {
@@ -760,13 +741,11 @@ export function App() {
       .slice(0, 10);
   }, [selectedMachineId, sessions]);
 
-  const totalDraftSets = sets.filter((set) => set.weightKg && set.reps).length;
   const totalSavedSets = sessions.reduce(
     (sessionTotal, session) =>
       sessionTotal + session.records.reduce((recordTotal, record) => recordTotal + record.sets.length, 0),
     0,
   );
-  const latestHistory = history[0];
   const oneRmWeightValue = Number(oneRmWeight);
   const oneRmRepsValue = Number(oneRmReps);
   const oneRmResult =
@@ -805,7 +784,7 @@ export function App() {
   const activeWorkoutParts = Array.from(new Set(activeWorkoutRecords.map((record) => record.muscleGroupLabel)));
   const activeWorkoutSetCount = activeWorkoutRecords.reduce((total, record) => total + record.setsCount, 0);
   const trainedDateSet = new Set(sessions.map((session) => session.workoutDate));
-  const todaysSessions = sessions.filter((session) => session.workoutDate === today);
+  const todaysSessions = sessions.filter((session) => session.workoutDate === todayDateKey);
   const visibleWorkoutRecords = workoutStartedAt == null ? [] : activeWorkoutRecords;
   const visibleWorkoutParts = Array.from(new Set(visibleWorkoutRecords.map((record) => record.muscleGroupLabel)));
   const visibleWorkoutSetCount = visibleWorkoutRecords.reduce((total, record) => total + record.setsCount, 0);
@@ -832,10 +811,9 @@ export function App() {
     ...favoriteMachines.slice(0, 8),
     ...recentMachines.filter((machine) => !favoriteMachineIds.has(machine.id)).slice(0, 8),
   ].slice(0, 10);
-  const summarySession =
-    sessions.find((session) => session.id === summarySessionId) ??
-    sessions.find((session) => session.status === 'FINISHED' && session.workoutDate === today) ??
-    null;
+  const summarySession = summarySessionId
+    ? sessions.find((session) => session.id === summarySessionId) ?? null
+    : sessions.find((session) => session.status === 'FINISHED' && session.workoutDate === todayDateKey) ?? null;
   const summaryStats = getSessionStats(summarySession);
   const summaryTotalReps = summarySession?.records.reduce(
     (total, record) => total + record.sets.reduce((setTotal, set) => setTotal + set.reps, 0),
@@ -926,6 +904,7 @@ export function App() {
   }
 
   function toggleSetComplete(setId: number) {
+    const targetSetNumber = sets.findIndex((set) => set.id === setId) + 1;
     setSets((current) =>
       current.map((set) => {
         if (set.id !== setId) {
@@ -936,10 +915,16 @@ export function App() {
         return {
           ...set,
           completed: nextCompleted,
-          remainingSeconds: nextCompleted ? restDurationSeconds : 0,
         };
       }),
     );
+
+    const targetSet = sets.find((set) => set.id === setId);
+    if (!targetSet?.completed) {
+      setRestRemainingSeconds(restDurationSeconds);
+      setRestAlertOpen(false);
+      setLastCompletedSetNumber(targetSetNumber > 0 ? targetSetNumber : null);
+    }
   }
 
   function updateRestDuration(nextValue: number) {
@@ -952,6 +937,9 @@ export function App() {
     setMemo('');
     setNote('');
     setSets([createDraftSet(), createDraftSet(), createDraftSet()]);
+    setRestRemainingSeconds(0);
+    setRestAlertOpen(false);
+    setLastCompletedSetNumber(null);
   }
 
   function toActiveWorkoutRecords(session: WorkoutSession): ActiveWorkoutRecord[] {
@@ -985,7 +973,7 @@ export function App() {
     return {
       id: `local-${Date.now()}`,
       userId: user?.id,
-      workoutDate: today,
+      workoutDate: todayDateKey,
       status: 'IN_PROGRESS',
       startedAt: now,
       memo: null,
@@ -1004,7 +992,7 @@ export function App() {
 
     if (user) {
       try {
-        const startedSession = await api.startWorkoutSession(user.id, { workoutDate: today, memo });
+        const startedSession = await api.startWorkoutSession(user.id, { workoutDate: todayDateKey, memo });
         setSessions((current) => [
           startedSession,
           ...current.filter((session) => session.id !== startedSession.id && session.id !== activeSessionId),
@@ -1026,7 +1014,7 @@ export function App() {
     setWorkoutStartedAt(localSession.startedAt ? new Date(localSession.startedAt).getTime() : Date.now());
     setWorkoutElapsedSeconds(0);
     setActiveWorkoutRecords([]);
-    setWorkoutDate(today);
+    setWorkoutDate(todayDateKey);
     return localSession.id;
   }
 
@@ -1087,6 +1075,9 @@ export function App() {
 
     setWorkoutStartedAt(null);
     setActiveSessionId(null);
+    setRestRemainingSeconds(0);
+    setRestAlertOpen(false);
+    setLastCompletedSetNumber(null);
     setExercisePickerOpen(false);
     setExerciseFormOpen(false);
     setCustomExerciseOpen(false);
@@ -1448,6 +1439,9 @@ export function App() {
     setWorkoutElapsedSeconds(0);
     setActiveSessionId(null);
     setActiveWorkoutRecords([]);
+    setRestRemainingSeconds(0);
+    setRestAlertOpen(false);
+    setLastCompletedSetNumber(null);
     setExercisePickerOpen(false);
     setExerciseFormOpen(false);
     setCustomExerciseOpen(false);
@@ -1566,11 +1560,13 @@ export function App() {
           <button className={activeView === 'home' ? 'active' : ''} type="button" onClick={() => navigateToView('home')}>
             홈
           </button>
-          <button className={activeView === 'planner' ? 'active' : ''} type="button" onClick={() => navigateToView('planner')}>
-            루틴설계
-          </button>
+          {routinePlannerEnabled && (
+            <button className={activeView === 'planner' ? 'active' : ''} type="button" onClick={() => navigateToView('planner')}>
+              루틴설계
+            </button>
+          )}
           <button className={activeView === 'record' ? 'active' : ''} type="button" onClick={() => navigateToView('record')}>
-            운동기록
+            운동하기
           </button>
           <button className={activeView === 'oneRm' ? 'active' : ''} type="button" onClick={() => navigateToView('oneRm')}>
             1RM
@@ -1598,7 +1594,7 @@ export function App() {
             기구별로 남겨볼까요?
           </h1>
           <button type="button" onClick={() => navigateToView('record')}>
-            {workoutStartedAt == null ? '운동 기록 열기' : '운동 이어가기'}
+            {workoutStartedAt == null ? '운동 시작하기' : '운동 이어가기'}
           </button>
         </div>
       </section>
@@ -1612,7 +1608,7 @@ export function App() {
                 <p>기록, 휴식 타이머, 이전 수행 기록을 한 흐름으로 관리합니다.</p>
               </div>
               <button className="link-button" type="button" onClick={() => navigateToView('record')}>
-                {workoutStartedAt == null ? '운동 기록 열기' : '운동 이어가기'}
+                {workoutStartedAt == null ? '운동 시작하기' : '운동 이어가기'}
                 <ChevronRight size={16} />
               </button>
             </div>
@@ -1631,7 +1627,7 @@ export function App() {
                 {workoutStartedAt == null ? (
                   <button className="primary-button" type="button" onClick={() => navigateToView('record')}>
                     <Timer size={16} />
-                    운동 기록 열기
+                    운동 시작하기
                   </button>
                 ) : (
                   <>
@@ -1679,10 +1675,12 @@ export function App() {
                 <strong>새 운동 기록</strong>
                 <span>기구를 고르고 세트별 무게/횟수를 입력합니다.</span>
               </button>
-              <button type="button" onClick={() => navigateToView('planner')}>
-                <strong>AI 루틴 설계</strong>
-                <span>프로필과 분할 방식을 고르면 주간 플랜 초안을 만듭니다.</span>
-              </button>
+              {routinePlannerEnabled && (
+                <button type="button" onClick={() => navigateToView('planner')}>
+                  <strong>AI 루틴 설계</strong>
+                  <span>프로필과 분할 방식을 고르면 주간 플랜 초안을 만듭니다.</span>
+                </button>
+              )}
               <button type="button" onClick={() => navigateToView('oneRm')}>
                 <strong>1RM 계산기</strong>
                 <span>주요 리프트의 예상 최대 중량을 빠르게 계산합니다.</span>
@@ -1695,7 +1693,7 @@ export function App() {
           </section>
         )}
 
-        {activeView === 'planner' && (
+        {routinePlannerEnabled && activeView === 'planner' && (
           <section className="planner-page">
             <div className="section-heading">
               <div>
@@ -1869,7 +1867,7 @@ export function App() {
               className={[
                 'workout-log-stage',
                 workoutStartedAt == null ? '' : 'active',
-                recordVisualMode === 'market' ? 'market-stage' : '',
+                'market-stage',
               ].filter(Boolean).join(' ')}
             >
               <div className="chart-control-dock">
@@ -1891,12 +1889,11 @@ export function App() {
                 </div>
               </div>
 
-              <div
-                className={recordVisualMode === 'market' ? 'muscle-visual-card market-mode' : 'muscle-visual-card'}
-                aria-label={recordVisualMode === 'market' ? '운동 중 주식 차트' : '오늘 운동 부위 비주얼'}
-              >
-                {recordVisualMode === 'market' && user && <MarketQuotePanel userId={user.id} />}
-              </div>
+              {recordVisualMode === 'market' && (
+                <div className="muscle-visual-card market-mode" aria-label="운동 중 주식 차트">
+                  {user && <MarketQuotePanel userId={user.id} />}
+                </div>
+              )}
 
               <div className="workout-log-list">
                 {visibleWorkoutRecords.length === 0 && (
@@ -2147,19 +2144,23 @@ export function App() {
                         <h2>{selectedMachine?.name ?? '오늘 운동한 기구를 선택하세요'}</h2>
                         <p>{selectedMachine?.description ?? '기구를 선택하면 기록 입력과 이전 기록이 연결됩니다.'}</p>
                       </div>
-                      <div className="mini-metric">
-                        <Activity size={18} />
-                        <strong>{totalDraftSets}</strong>
-                        <span>입력 세트</span>
-                      </div>
                     </div>
 
                     <div className="sets-header">
                       <div>
                         <h3>세트 기록</h3>
-                        <p>완료를 누르면 설정한 휴식 타이머가 시작됩니다.</p>
+                        <p>kg와 횟수를 입력하고 세트완료를 누르면 상단 휴식 타이머가 시작됩니다.</p>
                       </div>
                       <div className="set-tools">
+                        <div className={restRemainingSeconds > 0 ? 'rest-status-card active' : 'rest-status-card'}>
+                          <span>휴식 타이머</span>
+                          <strong>{formatSeconds(restRemainingSeconds > 0 ? restRemainingSeconds : restDurationSeconds)}</strong>
+                          <small>
+                            {restRemainingSeconds > 0
+                              ? `${lastCompletedSetNumber ?? ''}세트 후 휴식 중`
+                              : '세트완료 시 시작'}
+                          </small>
+                        </div>
                         <div className="rest-stepper" aria-label="세트간 휴식 시간 설정">
                           <button
                             aria-label="휴식 시간 10초 줄이기"
@@ -2189,39 +2190,46 @@ export function App() {
                       </div>
                     </div>
 
+                    <div className="set-column-guide" aria-hidden="true">
+                      <span>세트</span>
+                      <span>무게</span>
+                      <span>횟수</span>
+                      <span>완료</span>
+                    </div>
+
                     <div className="set-grid">
                       {sets.map((set, index) => (
                         <div className={set.completed ? 'set-row completed' : 'set-row'} key={set.id}>
                           <span className="set-number">{index + 1}</span>
-                          <input
-                            inputMode="decimal"
-                            placeholder="kg"
-                            value={set.weightKg}
-                            onChange={(event) => updateSet(set.id, 'weightKg', event.target.value)}
-                          />
-                          <input
-                            inputMode="numeric"
-                            placeholder="회"
-                            value={set.reps}
-                            onChange={(event) => updateSet(set.id, 'reps', event.target.value)}
-                          />
+                          <label className="compact-set-field">
+                            <span>kg</span>
+                            <input
+                              inputMode="decimal"
+                              aria-label={`${index + 1}세트 중량`}
+                              placeholder="0"
+                              value={set.weightKg}
+                              onChange={(event) => updateSet(set.id, 'weightKg', event.target.value)}
+                            />
+                          </label>
+                          <label className="compact-set-field">
+                            <span>회</span>
+                            <input
+                              inputMode="numeric"
+                              aria-label={`${index + 1}세트 횟수`}
+                              placeholder="0"
+                              value={set.reps}
+                              onChange={(event) => updateSet(set.id, 'reps', event.target.value)}
+                            />
+                          </label>
                           <button
                             className="complete-set-button"
                             type="button"
-                            aria-label={`${index + 1}세트 완료`}
+                            aria-label={`${index + 1}세트 완료하고 휴식 타이머 시작`}
                             onClick={() => toggleSetComplete(set.id)}
                           >
                             <CheckCircle2 size={16} />
-                            <span>{set.completed ? '완료됨' : '완료'}</span>
+                            <span>{set.completed ? '완료됨' : '세트완료'}</span>
                           </button>
-                          <strong className={set.remainingSeconds > 0 ? 'rest-timer active' : 'rest-timer'}>
-                            <Timer size={16} />
-                            {set.completed
-                              ? set.remainingSeconds > 0
-                                ? formatSeconds(set.remainingSeconds)
-                                : '휴식 끝'
-                              : formatSeconds(restDurationSeconds)}
-                          </strong>
                           <button
                             aria-label={`${index + 1}세트 삭제`}
                             className="delete-set-button"
@@ -2231,14 +2239,21 @@ export function App() {
                           >
                             <Trash2 size={16} />
                           </button>
-                          {formatPreviousSet(latestHistory?.sets[index], set) && (
-                            <small className="previous-set-hint">
-                              {formatPreviousSet(latestHistory?.sets[index], set)}
-                            </small>
-                          )}
                         </div>
                       ))}
                     </div>
+
+                    {restAlertOpen && (
+                      <div className="rest-alert" role="status" aria-live="polite">
+                        <div>
+                          <strong>휴식 끝</strong>
+                          <span>다음 세트를 시작할 시간입니다.</span>
+                        </div>
+                        <button type="button" onClick={() => setRestAlertOpen(false)}>
+                          확인
+                        </button>
+                      </div>
+                    )}
 
                     <label className="note-field">
                       <span>기구별 메모</span>
@@ -2270,19 +2285,6 @@ export function App() {
                   </form>
 
                   <aside className="insight-panel">
-                    <div className="insight-card">
-                      <div className="panel-title">
-                        <Trophy size={18} />
-                        <h3>선택 기구 요약</h3>
-                      </div>
-                      <strong>{selectedMachine?.name ?? '기구 미선택'}</strong>
-                      <p>
-                        {latestHistory
-                          ? `${latestHistory.workoutDate}에 ${latestHistory.sets.length}세트 수행`
-                          : '아직 이 기구의 이전 기록이 없습니다.'}
-                      </p>
-                    </div>
-
                     <div className="insight-card insight-chart-card">
                       <div className="panel-title">
                         <Activity size={18} />
@@ -2510,6 +2512,33 @@ export function App() {
                     </article>
                   ))}
                 </div>
+              </article>
+            </section>
+          </section>
+        )}
+
+        {activeView === 'summary' && !summarySession && (
+          <section className="workout-summary-page">
+            <div className="section-heading">
+              <div>
+                <h2>운동 완료</h2>
+                <p>요약을 표시할 운동 세션을 찾지 못했습니다.</p>
+              </div>
+              <button className="link-button" type="button" onClick={() => navigateToView('activity')}>
+                내 활동에서 보기
+                <ChevronRight size={16} />
+              </button>
+              <button className="summary-share-button" type="button" onClick={() => navigateToView('record')}>
+                <Plus size={17} />
+                운동 기록하기
+              </button>
+            </div>
+            <section className="summary-showcase">
+              <article className="summary-story-card">
+                <div className="summary-story-header">
+                  <strong>아직 공유할 기록이 없습니다</strong>
+                </div>
+                <p className="empty">운동을 종료하면 이곳에서 완료 요약과 공유 이미지를 확인할 수 있습니다.</p>
               </article>
             </section>
           </section>

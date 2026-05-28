@@ -1919,29 +1919,6 @@ button {
   line-height: 1.55;
 }
 
-.mini-metric {
-  display: grid;
-  min-width: 92px;
-  justify-items: center;
-  gap: 4px;
-  border-radius: 8px;
-  background: #f1f6ff;
-  color: #0a66d8;
-  padding: 14px 12px;
-}
-
-.mini-metric strong {
-  color: #06172e;
-  font-size: 24px;
-  line-height: 1;
-}
-
-.mini-metric span {
-  color: #536274;
-  font-size: 12px;
-  font-weight: 800;
-}
-
 .form-row {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
@@ -2010,10 +1987,45 @@ textarea {
 }
 
 .set-tools {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto auto;
+  align-items: stretch;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.rest-status-card {
+  display: grid;
+  min-width: 170px;
+  gap: 2px;
+  border: 1px solid #d9e0ea;
+  border-radius: 8px;
+  background: #f8fafd;
+  color: #536274;
+  padding: 8px 12px;
+}
+
+.rest-status-card span,
+.rest-status-card small {
+  color: #697484;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.rest-status-card strong {
+  color: #06172e;
+  font-size: 20px;
+  line-height: 1.05;
+}
+
+.rest-status-card.active {
+  border-color: rgba(10, 102, 216, 0.28);
+  background: #f1f6ff;
+}
+
+.rest-status-card.active span,
+.rest-status-card.active strong {
+  color: #0a66d8;
 }
 
 .rest-stepper {
@@ -2060,27 +2072,31 @@ textarea {
   gap: 8px;
 }
 
+.set-column-guide {
+  display: grid;
+  grid-template-columns: 42px minmax(118px, 1fr) minmax(108px, 0.9fr) 118px 40px;
+  gap: 8px;
+  align-items: center;
+  color: #697484;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.set-column-guide span {
+  display: block;
+}
+
+.set-column-guide span:nth-child(4) {
+  text-align: center;
+}
+
 .set-row {
   display: grid;
-  grid-template-columns: 42px minmax(90px, 1fr) minmax(80px, 0.8fr) 92px 96px 40px;
+  grid-template-columns: 42px minmax(118px, 1fr) minmax(108px, 0.9fr) 118px 40px;
   gap: 8px;
   align-items: center;
   border: 1px solid transparent;
   border-radius: 8px;
-}
-
-.previous-set-hint {
-  display: inline-flex;
-  width: fit-content;
-  max-width: 100%;
-  grid-column: 2 / -1;
-  border-radius: 6px;
-  background: #f4f7fb;
-  color: #697484;
-  line-height: 1.35;
-  padding: 4px 7px;
-  font-size: 12px;
-  font-weight: 850;
 }
 
 .set-row.completed {
@@ -2099,9 +2115,31 @@ textarea {
   font-weight: 900;
 }
 
+.compact-set-field {
+  position: relative;
+  display: block;
+}
+
+.compact-set-field span {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  color: #8a96a6;
+  font-size: 12px;
+  font-weight: 900;
+  pointer-events: none;
+}
+
+.compact-set-field input {
+  height: 43px;
+  padding: 10px 34px 10px 12px;
+  font-size: 17px;
+  font-weight: 850;
+}
+
 .complete-set-button,
-.delete-set-button,
-.rest-timer {
+.delete-set-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2124,18 +2162,6 @@ textarea {
   color: #ffffff;
 }
 
-.rest-timer {
-  border: 1px solid #e1e6ee;
-  background: #f8fafd;
-  color: #697484;
-}
-
-.rest-timer.active {
-  border-color: #0a66d8;
-  background: #f1f6ff;
-  color: #0a66d8;
-}
-
 .delete-set-button {
   border: 1px solid #f0d6d6;
   background: #fff8f8;
@@ -2148,6 +2174,46 @@ textarea {
   border-color: #e6eaf0;
   background: #f8fafd;
   color: #b1bac6;
+}
+
+.rest-alert {
+  position: sticky;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(10, 102, 216, 0.22);
+  border-radius: 8px;
+  background: #f1f6ff;
+  padding: 12px;
+}
+
+.rest-alert div {
+  display: grid;
+  gap: 3px;
+}
+
+.rest-alert strong {
+  color: #0a66d8;
+  font-size: 15px;
+}
+
+.rest-alert span {
+  color: #536274;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.rest-alert button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: #0a66d8;
+  color: #ffffff;
+  padding: 0 14px;
+  font-weight: 900;
 }
 
 .form-actions {
@@ -3957,30 +4023,51 @@ button.calendar-day {
 
   .set-tools {
     width: 100%;
-    justify-content: stretch;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .set-tools > button,
+  .rest-status-card {
+    grid-column: 1 / -1;
+    min-width: 0;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .rest-status-card strong {
+    justify-self: center;
+  }
+
+  .set-tools > button {
+    min-width: 92px;
+  }
+
   .rest-stepper {
-    flex: 1;
+    min-width: 0;
   }
 
   .rest-stepper span {
-    flex: 1;
+    min-width: 62px;
   }
 
   .set-grid {
     gap: 12px;
   }
 
+  .set-column-guide {
+    grid-template-columns: 34px minmax(78px, 1fr) minmax(66px, 0.8fr) 52px 34px;
+    gap: 8px;
+    padding: 0 9px;
+  }
+
+  .set-column-guide span:nth-child(4) {
+    font-size: 12px;
+  }
+
   .set-row {
-    grid-template-columns: 38px minmax(58px, 0.72fr) minmax(52px, 0.6fr) 42px 42px;
-    grid-template-areas:
-      "number weight reps complete delete"
-      "timer timer timer timer timer"
-      "previous previous previous previous previous";
+    grid-template-columns: 34px minmax(78px, 1fr) minmax(66px, 0.8fr) 52px 34px;
+    grid-template-areas: "number weight reps complete delete";
     gap: 8px;
     border-color: #e1e6ee;
     border-radius: 12px;
@@ -3997,21 +4084,25 @@ button.calendar-day {
     font-size: 18px;
   }
 
-  .set-row input:first-of-type {
+  .compact-set-field:first-of-type {
     grid-area: weight;
   }
 
-  .set-row input:last-of-type {
+  .compact-set-field:last-of-type {
     grid-area: reps;
   }
 
-  .set-row input {
+  .compact-set-field input {
     min-height: 48px;
     border-radius: 12px;
-    padding: 10px 6px;
+    padding: 10px 28px 10px 8px;
     font-size: 16px;
     font-weight: 800;
-    text-align: center;
+  }
+
+  .compact-set-field span {
+    right: 9px;
+    font-size: 11px;
   }
 
   .complete-set-button {
@@ -4024,20 +4115,6 @@ button.calendar-day {
 
   .complete-set-button span {
     display: none;
-  }
-
-  .rest-timer {
-    grid-area: timer;
-    min-height: 38px;
-    border-radius: 10px;
-    font-size: 14px;
-  }
-
-  .previous-set-hint {
-    grid-area: previous;
-    width: 100%;
-    padding: 5px 7px;
-    font-size: 12px;
   }
 
   .delete-set-button {

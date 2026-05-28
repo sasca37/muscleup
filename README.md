@@ -4,11 +4,13 @@ Spring Boot + React 기반 헬스 기록 MVP입니다.
 
 ## MVP 범위
 
-- 소셜 로그인 기반 사용자 식별
+- 이메일/비밀번호 기반 회원가입과 로그인
 - 부위별 운동 기구 목록
 - 기구별 운동 기록 작성
 - 기구 선택 시 이전 기록 조회
 - 날짜별 운동 세션 조회
+- 1RM 계산기와 주간 루틴 초안
+- KIS REST API 기반 미국주식 현재가 관심 목록
 
 커뮤니티 기능은 2차 범위로 분리했습니다.
 
@@ -36,7 +38,7 @@ npm install
 npm run dev
 ```
 
-기본 프론트 API 주소는 `http://localhost:8080`입니다.
+기본 프론트 API 주소는 `http://localhost:8080`입니다. 백엔드는 기본적으로 `MONGODB_URI`를 사용하며, 값이 없으면 `mongodb://localhost:27017/repick`에 연결합니다.
 
 프론트 환경 예시는 아래처럼 나눴습니다.
 
@@ -92,18 +94,24 @@ cd backend
 
 ## 인증 설정
 
-초기 개발 편의를 위해 백엔드는 기본값으로 dev 사용자 모드를 사용합니다. 이 상태에서는 OAuth 키 없이도 API와 프론트 화면을 바로 확인할 수 있습니다.
+현재 인증은 이메일과 비밀번호 기반입니다.
 
-소셜 로그인으로 전환하려면 `DEV_AUTH_ENABLED=false`를 설정하고 OAuth 클라이언트 값을 넣습니다.
+- 회원가입: `POST /api/users/register`
+- 로그인: `POST /api/users/login`
+- 비밀번호는 BCrypt 해시로 저장합니다.
+- 운동 세션 API는 임시로 로그인 유저의 `id`를 `X-User-Id` 헤더에 담아 호출합니다.
+
+OAuth와 소셜 로그인은 현재 MVP 범위에서 제외했고, 추후 명시적으로 다시 붙일 예정입니다.
+
+## KIS 현재가 설정
+
+미국주식 현재가 기능을 실제로 사용하려면 백엔드 환경변수에 한국투자증권 KIS 키를 설정해야 합니다.
 
 ```bash
-export DEV_AUTH_ENABLED=false
-export GOOGLE_CLIENT_ID=...
-export GOOGLE_CLIENT_SECRET=...
-export KAKAO_CLIENT_ID=...
-export KAKAO_CLIENT_SECRET=...
+KIS_BASE_URL=https://openapi.koreainvestment.com:9443
+KIS_APP_KEY=...
+KIS_APP_SECRET=...
+KIS_PRICE_DETAIL_TR_ID=HHDFS76200200
 ```
 
-첫 개발 단계에서는 Google 또는 Kakao 중 하나만 설정해도 됩니다.
-
-OAuth 등록 예시는 [application-oauth.example.yml](backend/src/main/resources/application-oauth.example.yml)에 있습니다.
+로컬 예시는 [backend/.env.example](backend/.env.example)에 있습니다. 실제 키는 Git에 커밋하지 마세요.

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,6 +23,7 @@ public class WorkoutSessionService {
 
     private static final int DEFAULT_HISTORY_LIMIT = 30;
     private static final int DEFAULT_EXERCISE_HISTORY_LIMIT = 10;
+    private static final ZoneId APP_DATE_ZONE = ZoneId.of("Asia/Seoul");
 
     private final WorkoutSessionRepository workoutSessionRepository;
     private final ExerciseRepository exerciseRepository;
@@ -93,6 +95,9 @@ public class WorkoutSessionService {
             throw new InvalidWorkoutSessionRequestException("운동 종목을 찾을 수 없습니다.");
         }
         WorkoutSession session = findSessionForUser(sessionId, userId);
+        if (session.getStatus() == WorkoutSessionStatus.FINISHED) {
+            throw new InvalidWorkoutSessionRequestException("완료된 운동 세션에는 기록을 추가할 수 없습니다.");
+        }
         List<WorkoutSet> sets = createSets(setInputs);
 
         session.addRecord(WorkoutRecord.from(exercise, normalizeNullableText(note, 200), sets));
@@ -190,7 +195,7 @@ public class WorkoutSessionService {
 
     private String normalizeWorkoutDate(String rawWorkoutDate) {
         if (rawWorkoutDate == null || rawWorkoutDate.isBlank()) {
-            return LocalDate.now().toString();
+            return LocalDate.now(APP_DATE_ZONE).toString();
         }
 
         String workoutDate = rawWorkoutDate.trim();
