@@ -1,4 +1,4 @@
-import { Activity, Dumbbell, LogIn, TrendingUp, UserPlus } from 'lucide-react';
+import { Activity, Dumbbell, Gift, LogIn, Sparkles, TrendingUp, UserPlus } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 import { api } from '../api/client';
 import type { AgeGroup, Gender, RegisterPayload, User, WorkoutGoal } from '../types/domain';
@@ -87,8 +87,8 @@ export function LoginGate({ onLoginSuccess }: LoginGateProps) {
           Repick
         </button>
         <nav className="public-nav" aria-label="소개 메뉴">
-          <a href="#features">기능</a>
-          <a href="#preview">미리보기</a>
+          <a href="#features">성장 방식</a>
+          <a href="#preview">캐릭터</a>
           <a href="#start">시작하기</a>
         </nav>
         <div className="public-auth-actions">
@@ -116,19 +116,20 @@ export function LoginGate({ onLoginSuccess }: LoginGateProps) {
       <section className="public-hero" id="start">
         <div className="hero-glow" />
         <div className="public-copy">
-          <span>운동 기록을 더 가볍게</span>
+          <span>운동 기록으로 키우는 내 캐릭터</span>
           <h1>
-            오늘 한 세트,
+            캐릭터를
             <br />
-            다음 운동의 기준이 되게.
+            키워보시겠어요?
           </h1>
           <p>
-            Repick은 운동 기구별 무게, 횟수, 이전 기록을 빠르게 확인하는 헬스 기록 서비스입니다.
+            운동을 기록하면 닭가슴살을 모으고, 모은 보상으로 캐릭터와 펫을 꾸밀 수 있어요.
+            기록 습관이 쌓일수록 내 운동 파트너도 같이 살아납니다.
           </p>
           <div className="public-actions">
             <button className="primary-button" type="button" onClick={() => openAuth('register')}>
               <UserPlus size={16} />
-              회원가입하고 기록하기
+              캐릭터 키우기 시작
             </button>
             <button className="secondary-auth-button" type="button" onClick={() => openAuth('login')}>
               <LogIn size={16} />
@@ -141,48 +142,51 @@ export function LoginGate({ onLoginSuccess }: LoginGateProps) {
         </div>
 
         <div className="phone-preview" id="preview" aria-label="앱 화면 미리보기">
-          <div className="phone-bar" />
+          <div className="character-banner-preview">
+            <span className="preview-badge">
+              <Sparkles size={15} />
+              LV.7
+            </span>
+            <img alt="캐릭터 미리보기" className="preview-avatar" src="/avatars/male-character-2.png" />
+            <img alt="펫 미리보기" className="preview-pet" src="/companions/cat-brown-2.png" />
+          </div>
           <div className="phone-card active">
-            <div className="brand-mark">
-              <Dumbbell size={22} />
-            </div>
+            <Gift size={20} />
             <div>
-              <strong>레그 프레스</strong>
-              <span>120kg x 10 · 3세트</span>
+              <strong>닭가슴살 +28</strong>
+              <span>운동 기록 보상 적립</span>
             </div>
           </div>
           <div className="phone-card">
-            <Activity size={20} />
+            <Dumbbell size={20} />
             <div>
-              <strong>오늘 입력</strong>
-              <span>가슴 · 하체 루틴</span>
+              <strong>오늘의 퀘스트</strong>
+              <span>하체 루틴 4세트 완료</span>
             </div>
           </div>
-          <div className="phone-card">
-            <TrendingUp size={20} />
-            <div>
-              <strong>이전 기록</strong>
-              <span>지난 운동보다 +10kg</span>
-            </div>
+          <div className="preview-shop-strip">
+            <span>펫</span>
+            <span>옷</span>
+            <span>악세사리</span>
           </div>
         </div>
       </section>
 
       <section className="public-features" id="features">
         <article>
-          <Dumbbell size={22} />
-          <strong>기구별 기록</strong>
-          <span>부위와 머신을 고르고 세트별 무게와 횟수를 저장합니다.</span>
+          <Activity size={22} />
+          <strong>운동하면 보상</strong>
+          <span>세트와 운동 날짜가 쌓이면 닭가슴살 보상이 늘어납니다.</span>
+        </article>
+        <article>
+          <Gift size={22} />
+          <strong>상점에서 꾸미기</strong>
+          <span>캐릭터, 옷, 악세사리, 펫을 보상으로 하나씩 해금합니다.</span>
         </article>
         <article>
           <TrendingUp size={22} />
-          <strong>이전 기록 확인</strong>
-          <span>같은 기구를 선택하면 최근 수행 기록을 바로 볼 수 있습니다.</span>
-        </article>
-        <article>
-          <Activity size={22} />
-          <strong>앱 확장 고려</strong>
-          <span>작은 화면에서도 CTA, 카드, 입력 흐름이 한 줄로 자연스럽게 접힙니다.</span>
+          <strong>기록은 그대로</strong>
+          <span>기구별 이전 기록과 캘린더도 함께 관리해 운동 흐름을 놓치지 않습니다.</span>
         </article>
       </section>
 

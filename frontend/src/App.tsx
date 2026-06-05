@@ -1,10 +1,13 @@
 import {
   Activity,
+  Award,
   CalendarDays,
   Calculator,
   ChevronRight,
   CheckCircle2,
   Dumbbell,
+  Flame,
+  Gift,
   History,
   LogOut,
   Minus,
@@ -12,12 +15,13 @@ import {
   RotateCcw,
   Save,
   Share2,
+  Sparkles,
   Star,
   Timer,
   Trash2,
   UserRound,
 } from 'lucide-react';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, type CSSProperties, useEffect, useMemo, useState } from 'react';
 import { api } from './api/client';
 import { LoginGate } from './components/LoginGate';
 import { MarketQuotePanel } from './components/MarketQuotePanel';
@@ -25,6 +29,7 @@ import { muscleGroups } from './data/muscleGroups';
 import { mockMachines } from './data/mockMachines';
 import type {
   ExerciseMachine,
+  Gender,
   MachineHistory,
   MuscleGroup,
   User,
@@ -39,12 +44,51 @@ type DraftSet = {
   completed: boolean;
 };
 
-type ActiveView = 'home' | 'planner' | 'record' | 'oneRm' | 'activity' | 'summary';
+type ActiveView = 'home' | 'planner' | 'record' | 'oneRm' | 'activity' | 'shop' | 'summary';
 type OneRmLift = 'squat' | 'benchPress' | 'deadlift' | 'overheadPress';
 type TrainingLevel = 'beginner' | 'intermediate' | 'advanced';
 type TrainingGoal = 'strength' | 'hypertrophy' | 'balanced';
 type SplitType = 'fullBody' | 'upperLower' | 'pushPullLegs' | 'bodyPart';
 type RecordVisualMode = 'body' | 'market';
+type ShopCategory = 'avatar' | 'clothing' | 'accessory' | 'companion';
+type ShopSlot = 'outfit' | 'accessory' | 'companion';
+
+type AvatarCandidate = {
+  id: string;
+  gender: Gender;
+  name: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  unlockType: 'default' | 'chickenBreast';
+  unlockLabel?: string;
+  variant: 'sporty' | 'street' | 'clean';
+  hairColor: string;
+  outfitColor: string;
+  accentColor: string;
+  shoeColor: string;
+};
+
+type ShopItem = {
+  id: string;
+  category: ShopCategory;
+  slot?: ShopSlot;
+  avatarId?: string;
+  name: string;
+  description: string;
+  price: number;
+  tag: string;
+  visualClass: string;
+  imageUrl?: string;
+  gender?: Gender;
+};
+
+type ShopState = {
+  purchasedItemIds: string[];
+  spentChickenBreasts: number;
+  freeChickenBreasts: number;
+  equipped: Partial<Record<ShopSlot, string>>;
+};
 
 type RoutineDay = {
   dayLabel: string;
@@ -77,6 +121,11 @@ const mockSessionKey = 'repick-mock-session';
 const legacyMockSessionKey = 'muscle-log-mock-session';
 const restDurationKey = 'repick-rest-duration';
 const favoriteExercisesKeyPrefix = 'repick-favorite-exercises';
+const avatarSelectionKeyPrefix = 'repick-avatar-selection';
+const shopStateKeyPrefix = 'repick-shop-state';
+const chickenBreastGrantByEmail: Record<string, number> = {
+  'sasca37@naver.com': 100000,
+};
 const routinePlannerEnabled = import.meta.env.VITE_ENABLE_ROUTINE_PLANNER === 'true';
 const defaultRestSeconds = 60;
 const minRestSeconds = 10;
@@ -112,6 +161,269 @@ const priorityGroupOptions: { value: MuscleGroup; label: string }[] = [
   { value: 'CORE', label: '복근' },
 ];
 const weekLabels = ['월', '화', '수', '목', '금', '토', '일'];
+const avatarCandidates: AvatarCandidate[] = [
+  {
+    id: 'male-character-1',
+    gender: 'MALE',
+    name: '캐릭터1',
+    title: '캐릭터1',
+    description: '민트 티셔츠와 네이비 반바지',
+    imageUrl: '/avatars/male-character-1.png',
+    unlockType: 'chickenBreast',
+    unlockLabel: '닭가슴살 교환 예정',
+    variant: 'sporty',
+    hairColor: '#f4d985',
+    outfitColor: '#2f7569',
+    accentColor: '#f6c85f',
+    shoeColor: '#233748',
+  },
+  {
+    id: 'male-character-2',
+    gender: 'MALE',
+    name: '캐릭터2',
+    title: '캐릭터2',
+    description: '화이트 티셔츠와 블랙 반바지',
+    imageUrl: '/avatars/male-character-2.png',
+    unlockType: 'default',
+    variant: 'street',
+    hairColor: '#8b5a3c',
+    outfitColor: '#ffffff',
+    accentColor: '#2f4050',
+    shoeColor: '#111827',
+  },
+  {
+    id: 'male-character-3',
+    gender: 'MALE',
+    name: '캐릭터3',
+    title: '캐릭터3',
+    description: '코랄 티셔츠와 그레이 반바지',
+    imageUrl: '/avatars/male-character-3.png',
+    unlockType: 'default',
+    variant: 'clean',
+    hairColor: '#222831',
+    outfitColor: '#f47564',
+    accentColor: '#59626d',
+    shoeColor: '#50606c',
+  },
+  {
+    id: 'male-character-4',
+    gender: 'MALE',
+    name: '캐릭터4',
+    title: '캐릭터4',
+    description: '옐로우 티셔츠와 네이비 반바지',
+    imageUrl: '/avatars/male-character-4.png',
+    unlockType: 'chickenBreast',
+    unlockLabel: '닭가슴살 교환 예정',
+    variant: 'sporty',
+    hairColor: '#e8edf1',
+    outfitColor: '#f6e79a',
+    accentColor: '#2f4050',
+    shoeColor: '#233748',
+  },
+  {
+    id: 'female-character-1',
+    gender: 'FEMALE',
+    name: '캐릭터1',
+    title: '캐릭터1',
+    description: '민트 티셔츠와 네이비 반바지',
+    imageUrl: '/avatars/female-character-1.png',
+    unlockType: 'chickenBreast',
+    unlockLabel: '닭가슴살 교환 예정',
+    variant: 'sporty',
+    hairColor: '#f6d986',
+    outfitColor: '#ffffff',
+    accentColor: '#66b48d',
+    shoeColor: '#2f4050',
+  },
+  {
+    id: 'female-character-2',
+    gender: 'FEMALE',
+    name: '캐릭터2',
+    title: '캐릭터2',
+    description: '화이트 티셔츠와 블랙 반바지',
+    imageUrl: '/avatars/female-character-2.png',
+    unlockType: 'default',
+    variant: 'street',
+    hairColor: '#8b5a3c',
+    outfitColor: '#ffffff',
+    accentColor: '#2f4050',
+    shoeColor: '#111827',
+  },
+  {
+    id: 'female-character-3',
+    gender: 'FEMALE',
+    name: '캐릭터3',
+    title: '캐릭터3',
+    description: '코랄 티셔츠와 그레이 반바지',
+    imageUrl: '/avatars/female-character-3.png',
+    unlockType: 'default',
+    variant: 'clean',
+    hairColor: '#222831',
+    outfitColor: '#f47564',
+    accentColor: '#59626d',
+    shoeColor: '#63717a',
+  },
+  {
+    id: 'female-character-4',
+    gender: 'FEMALE',
+    name: '캐릭터4',
+    title: '캐릭터4',
+    description: '옐로우 티셔츠와 네이비 반바지',
+    imageUrl: '/avatars/female-character-4.png',
+    unlockType: 'chickenBreast',
+    unlockLabel: '닭가슴살 교환 예정',
+    variant: 'sporty',
+    hairColor: '#f1f3f2',
+    outfitColor: '#f6e79a',
+    accentColor: '#2f4050',
+    shoeColor: '#63717a',
+  },
+];
+const defaultShopState: ShopState = {
+  purchasedItemIds: [],
+  spentChickenBreasts: 0,
+  freeChickenBreasts: 0,
+  equipped: {},
+};
+const shopCatalog: ShopItem[] = [
+  {
+    id: 'avatar-male-character-1',
+    category: 'avatar',
+    avatarId: 'male-character-1',
+    gender: 'MALE',
+    name: '남자 캐릭터1',
+    description: '민트 티셔츠 기본 아바타',
+    price: 180,
+    tag: '캐릭터',
+    visualClass: 'avatar-unlock-mint',
+  },
+  {
+    id: 'avatar-male-character-4',
+    category: 'avatar',
+    avatarId: 'male-character-4',
+    gender: 'MALE',
+    name: '남자 캐릭터4',
+    description: '옐로우 티셔츠 기본 아바타',
+    price: 220,
+    tag: '캐릭터',
+    visualClass: 'avatar-unlock-yellow',
+  },
+  {
+    id: 'avatar-female-character-1',
+    category: 'avatar',
+    avatarId: 'female-character-1',
+    gender: 'FEMALE',
+    name: '여자 캐릭터1',
+    description: '민트 티셔츠 기본 아바타',
+    price: 180,
+    tag: '캐릭터',
+    visualClass: 'avatar-unlock-mint',
+  },
+  {
+    id: 'avatar-female-character-4',
+    category: 'avatar',
+    avatarId: 'female-character-4',
+    gender: 'FEMALE',
+    name: '여자 캐릭터4',
+    description: '옐로우 티셔츠 기본 아바타',
+    price: 220,
+    tag: '캐릭터',
+    visualClass: 'avatar-unlock-yellow',
+  },
+  {
+    id: 'outfit-black-training',
+    category: 'clothing',
+    slot: 'outfit',
+    name: '블랙 트레이닝 세트',
+    description: '깔끔한 검정 운동복 세트',
+    price: 120,
+    tag: '옷',
+    visualClass: 'outfit-black',
+  },
+  {
+    id: 'outfit-mint-runner',
+    category: 'clothing',
+    slot: 'outfit',
+    name: '민트 러너 세트',
+    description: '가벼운 민트 티셔츠와 반바지',
+    price: 100,
+    tag: '옷',
+    visualClass: 'outfit-mint',
+  },
+  {
+    id: 'outfit-coral-gym',
+    category: 'clothing',
+    slot: 'outfit',
+    name: '코랄 짐웨어',
+    description: '포인트 컬러가 있는 운동복',
+    price: 140,
+    tag: '옷',
+    visualClass: 'outfit-coral',
+  },
+  {
+    id: 'accessory-headband',
+    category: 'accessory',
+    slot: 'accessory',
+    name: '운동 헤어밴드',
+    description: '홈 화면 캐릭터 주변에 표시되는 악세사리',
+    price: 70,
+    tag: '악세사리',
+    visualClass: 'accessory-headband',
+  },
+  {
+    id: 'accessory-water-bottle',
+    category: 'accessory',
+    slot: 'accessory',
+    name: '물통',
+    description: '운동 파트너 옆 소품',
+    price: 80,
+    tag: '악세사리',
+    visualClass: 'accessory-bottle',
+  },
+  {
+    id: 'accessory-gym-bag',
+    category: 'accessory',
+    slot: 'accessory',
+    name: '짐백',
+    description: '홈짐 분위기의 작은 가방',
+    price: 110,
+    tag: '악세사리',
+    visualClass: 'accessory-bag',
+  },
+  {
+    id: 'cat-brown-1',
+    category: 'companion',
+    slot: 'companion',
+    name: '브라운 펫 1',
+    description: '복슬복슬한 기본 동행 펫',
+    price: 260,
+    tag: '펫',
+    visualClass: 'cat-brown-1',
+    imageUrl: '/companions/cat-brown-1.png',
+  },
+  {
+    id: 'cat-brown-2',
+    category: 'companion',
+    slot: 'companion',
+    name: '브라운 펫 2',
+    description: '깜짝 놀란 표정의 작은 동행 펫',
+    price: 320,
+    tag: '펫',
+    visualClass: 'cat-brown-2',
+    imageUrl: '/companions/cat-brown-2.png',
+  },
+  {
+    id: 'cat-brown-3',
+    category: 'companion',
+    slot: 'companion',
+    name: '브라운 펫 3',
+    description: '활발하게 굴러다니는 한정 펫',
+    price: 360,
+    tag: '펫',
+    visualClass: 'cat-brown-3',
+    imageUrl: '/companions/cat-brown-3.png',
+  },
+];
 const splitTemplates: Record<SplitType, { title: string; groups: MuscleGroup[] }[]> = {
   fullBody: [
     { title: '전신 A', groups: ['CHEST', 'BACK', 'LEGS', 'CORE'] },
@@ -163,6 +475,10 @@ function parseAppRoute(): AppRoute {
     return { view: 'activity', summarySessionId: null };
   }
 
+  if (path === '/shop') {
+    return { view: 'shop', summarySessionId: null };
+  }
+
   return { view: 'home', summarySessionId: null };
 }
 
@@ -183,11 +499,55 @@ function getAppRoutePath(view: ActiveView, summarySessionId?: string | null) {
     return '/activity';
   }
 
+  if (view === 'shop') {
+    return '/shop';
+  }
+
   if (view === 'summary' && summarySessionId) {
     return `/summary/${encodeURIComponent(summarySessionId)}`;
   }
 
   return '/';
+}
+
+function getAvatarUnlockItemId(avatarId: string) {
+  return `avatar-${avatarId}`;
+}
+
+function normalizeShopState(value: Partial<ShopState> | null | undefined): ShopState {
+  const spentChickenBreasts = Number(value?.spentChickenBreasts);
+  const freeChickenBreasts = Number(value?.freeChickenBreasts);
+
+  return {
+    purchasedItemIds: Array.isArray(value?.purchasedItemIds) ? value.purchasedItemIds : [],
+    spentChickenBreasts: Number.isFinite(spentChickenBreasts) ? spentChickenBreasts : 0,
+    freeChickenBreasts: Number.isFinite(freeChickenBreasts) ? freeChickenBreasts : 0,
+    equipped: value?.equipped ?? {},
+  };
+}
+
+function isAvatarCandidateUnlocked(candidate: AvatarCandidate, purchasedItemIds: Set<string>) {
+  return candidate.unlockType === 'default' || purchasedItemIds.has(getAvatarUnlockItemId(candidate.id));
+}
+
+function getShopItemById(itemId?: string | null) {
+  return itemId ? shopCatalog.find((item) => item.id === itemId) ?? null : null;
+}
+
+function getShopCategoryLabel(category: ShopCategory) {
+  if (category === 'avatar') {
+    return '캐릭터';
+  }
+
+  if (category === 'clothing') {
+    return '옷';
+  }
+
+  if (category === 'accessory') {
+    return '악세사리';
+  }
+
+  return '펫';
 }
 
 function createDraftSet(): DraftSet {
@@ -498,11 +858,106 @@ function getPrescription(goal: TrainingGoal, level: TrainingLevel) {
   return level === 'advanced' ? '4세트 x 8-15회' : '3세트 x 10-15회';
 }
 
+function getCharacterLevelStartExp(level: number) {
+  return Math.max(0, Math.round((level - 1) * (level - 1) * 220));
+}
+
+function getCharacterLevel(totalExp: number) {
+  let level = 1;
+
+  while (totalExp >= getCharacterLevelStartExp(level + 1)) {
+    level += 1;
+  }
+
+  return level;
+}
+
+function getWorkoutStreak(dateKeys: string[], todayDateKey: string) {
+  const trainedDates = new Set(dateKeys);
+  const today = new Date(`${todayDateKey}T00:00:00`);
+  const startDate = new Date(today);
+
+  if (!trainedDates.has(formatDateKey(startDate))) {
+    startDate.setDate(startDate.getDate() - 1);
+  }
+
+  let streak = 0;
+  const cursor = new Date(startDate);
+
+  while (trainedDates.has(formatDateKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return streak;
+}
+
+function WorkoutAvatar({
+  candidate,
+  compact = false,
+}: {
+  candidate: AvatarCandidate;
+  compact?: boolean;
+}) {
+  const avatarStyle = {
+    '--avatar-hair': candidate.hairColor,
+    '--avatar-outfit': candidate.outfitColor,
+    '--avatar-accent': candidate.accentColor,
+    '--avatar-shoe': candidate.shoeColor,
+  } as CSSProperties;
+
+  return (
+    <figure
+      className={[
+        'avatar-image-frame',
+        candidate.gender === 'FEMALE' ? 'female' : 'male',
+        candidate.variant,
+        compact ? 'compact' : '',
+      ].filter(Boolean).join(' ')}
+      style={avatarStyle}
+    >
+      <img alt={`${candidate.name} 아바타`} src={candidate.imageUrl} />
+    </figure>
+  );
+}
+
+function ShopItemVisual({ item }: { item: ShopItem }) {
+  const avatar = item.avatarId
+    ? avatarCandidates.find((candidate) => candidate.id === item.avatarId)
+    : null;
+
+  if (avatar) {
+    return (
+      <div className={`shop-item-visual avatar-preview ${item.visualClass}`}>
+        <WorkoutAvatar candidate={avatar} compact />
+      </div>
+    );
+  }
+
+  if (item.imageUrl) {
+    return (
+      <div className={`shop-item-visual image-preview ${item.visualClass}`}>
+        <img alt={`${item.name} 미리보기`} src={item.imageUrl} />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`shop-item-visual ${item.visualClass}`} aria-hidden="true">
+      <span className="shop-item-shape" />
+    </div>
+  );
+}
+
 export function App() {
   const initialRoute = useMemo(parseAppRoute, []);
   const todayDateKey = getTodayDateKey();
   const [user, setUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(null);
+  const [avatarChecked, setAvatarChecked] = useState(false);
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
+  const [shopState, setShopState] = useState<ShopState>(defaultShopState);
   const [activeView, setActiveView] = useState<ActiveView>(initialRoute.view);
   const [exerciseMachines, setExerciseMachines] = useState<ExerciseMachine[]>(mockMachines);
   const [selectedGroup, setSelectedGroup] = useState<MuscleGroup>('CHEST');
@@ -563,6 +1018,82 @@ export function App() {
     }
   }
 
+  function chooseAvatar(avatarId: string) {
+    if (!user) {
+      return;
+    }
+
+    const purchasedItemIds = new Set(shopState.purchasedItemIds);
+    const avatar = avatarCandidates.find(
+      (candidate) =>
+        candidate.id === avatarId &&
+        candidate.gender === user.gender &&
+        isAvatarCandidateUnlocked(candidate, purchasedItemIds),
+    );
+    if (!avatar) {
+      return;
+    }
+
+    window.localStorage.setItem(`${avatarSelectionKeyPrefix}:${user.id}`, avatar.id);
+    setSelectedAvatarId(avatar.id);
+    setAvatarPickerOpen(false);
+  }
+
+  function persistShopState(nextShopState: ShopState) {
+    if (!user) {
+      return;
+    }
+
+    window.localStorage.setItem(`${shopStateKeyPrefix}:${user.id}`, JSON.stringify(nextShopState));
+    setShopState(nextShopState);
+  }
+
+  function buyShopItem(item: ShopItem) {
+    if (!user || shopState.purchasedItemIds.includes(item.id) || item.price > chickenBreastBalance) {
+      return;
+    }
+
+    const nextEquipped = { ...shopState.equipped };
+    if (item.slot) {
+      nextEquipped[item.slot] = item.id;
+    }
+
+    const nextShopState: ShopState = {
+      purchasedItemIds: [...shopState.purchasedItemIds, item.id],
+      spentChickenBreasts: shopState.spentChickenBreasts + item.price,
+      freeChickenBreasts: shopState.freeChickenBreasts,
+      equipped: nextEquipped,
+    };
+
+    persistShopState(nextShopState);
+
+    if (item.avatarId && item.gender === user.gender) {
+      window.localStorage.setItem(`${avatarSelectionKeyPrefix}:${user.id}`, item.avatarId);
+      setSelectedAvatarId(item.avatarId);
+    }
+  }
+
+  function equipShopItem(item: ShopItem) {
+    if (!user || !item.slot || !shopState.purchasedItemIds.includes(item.id)) {
+      return;
+    }
+
+    persistShopState({
+      ...shopState,
+      equipped: {
+        ...shopState.equipped,
+        [item.slot]: item.id,
+      },
+    });
+  }
+
+  function receiveFreeChickenBreasts() {
+    persistShopState({
+      ...shopState,
+      freeChickenBreasts: shopState.freeChickenBreasts + 1000,
+    });
+  }
+
   useEffect(() => {
     const storedUser =
       window.localStorage.getItem(mockSessionKey) ?? window.localStorage.getItem(legacyMockSessionKey);
@@ -593,8 +1124,34 @@ export function App() {
 
   useEffect(() => {
     if (!user) {
+      setSelectedAvatarId(null);
+      setAvatarChecked(false);
+      setShopState(defaultShopState);
       return;
     }
+
+    let nextShopState = defaultShopState;
+    const storedShopState = window.localStorage.getItem(`${shopStateKeyPrefix}:${user.id}`);
+    if (storedShopState) {
+      try {
+        const parsedShopState = JSON.parse(storedShopState) as ShopState;
+        nextShopState = normalizeShopState(parsedShopState);
+      } catch {
+        nextShopState = defaultShopState;
+      }
+    }
+    setShopState(nextShopState);
+
+    const storedAvatarId = window.localStorage.getItem(`${avatarSelectionKeyPrefix}:${user.id}`);
+    const purchasedItemIds = new Set(nextShopState.purchasedItemIds);
+    const storedAvatar = avatarCandidates.find(
+      (candidate) =>
+        candidate.id === storedAvatarId &&
+        candidate.gender === user.gender &&
+        isAvatarCandidateUnlocked(candidate, purchasedItemIds),
+    );
+    setSelectedAvatarId(storedAvatar?.id ?? null);
+    setAvatarChecked(true);
 
     const storedFavorites = window.localStorage.getItem(`${favoriteExercisesKeyPrefix}:${user.id}`);
     if (storedFavorites) {
@@ -837,9 +1394,6 @@ export function App() {
   const todaysExerciseNames = Array.from(
     new Set(todaysSessions.flatMap((session) => session.records.map((record) => record.machineName))),
   );
-  const todaysParts = Array.from(
-    new Set(todaysSessions.flatMap((session) => session.records.map((record) => record.muscleGroupLabel))),
-  );
   const calendarBaseDate = new Date();
   const calendarYear = calendarBaseDate.getFullYear();
   const calendarMonth = calendarBaseDate.getMonth();
@@ -877,6 +1431,98 @@ export function App() {
   ];
   const workoutDateValue = new Date(`${workoutDate}T00:00:00`);
   const workoutDateLabel = `${workoutDateValue.getMonth() + 1}월 ${workoutDateValue.getDate()}일, 오후 운동`;
+  const totalWorkoutVolume = sessions.reduce((sessionTotal, session) => {
+    const stats = getSessionStats(session);
+    return sessionTotal + stats.volume;
+  }, 0);
+  const trainedDateKeys = Array.from(trainedDateSet);
+  const workoutStreak = getWorkoutStreak(trainedDateKeys, todayDateKey);
+  const completedSessionCount = sessions.filter((session) => session.status === 'FINISHED').length;
+  const earnedChickenBreasts = Math.round(completedSessionCount * 5 + totalSavedSets * 2 + trainedDateSet.size * 8);
+  const grantedChickenBreasts = user ? chickenBreastGrantByEmail[user.email.toLowerCase()] ?? 0 : 0;
+  const totalChickenBreasts = earnedChickenBreasts + grantedChickenBreasts + shopState.freeChickenBreasts;
+  const chickenBreastBalance = Math.max(0, totalChickenBreasts - shopState.spentChickenBreasts);
+  const purchasedShopItemIds = new Set(shopState.purchasedItemIds);
+  const userAvatarCandidates = user
+    ? avatarCandidates.filter((candidate) => candidate.gender === user.gender)
+    : [];
+  const defaultUserAvatarCandidates = userAvatarCandidates.filter((candidate) => candidate.unlockType === 'default');
+  const selectedAvatar =
+    userAvatarCandidates.find((candidate) => candidate.id === selectedAvatarId) ??
+    defaultUserAvatarCandidates[0] ??
+    avatarCandidates[0];
+  const avatarSelectionRequired = Boolean(user && avatarChecked && !selectedAvatarId);
+  const avatarSelectionOpen = Boolean(user && avatarChecked && (!selectedAvatarId || avatarPickerOpen));
+  const characterTotalExp = Math.round(totalSavedSets * 34 + trainedDateSet.size * 120 + totalWorkoutVolume / 90);
+  const characterLevel = getCharacterLevel(characterTotalExp);
+  const characterLevelStartExp = getCharacterLevelStartExp(characterLevel);
+  const characterNextLevelExp = getCharacterLevelStartExp(characterLevel + 1);
+  const characterCurrentExp = characterTotalExp - characterLevelStartExp;
+  const characterLevelExp = characterNextLevelExp - characterLevelStartExp;
+  const characterExpPercent = Math.min(100, Math.max(0, (characterCurrentExp / characterLevelExp) * 100));
+  const characterMood =
+    workoutStartedAt != null
+      ? '운동 중이라 눈이 반짝이는 중'
+      : todaysSessions.length > 0
+        ? '오늘 운동 보상으로 기분 최고'
+        : workoutStreak > 0
+          ? '다음 세트를 기다리는 중'
+          : '첫 운동을 기다리는 중';
+  const characterTitle =
+    characterLevel >= 12
+      ? '든든한 운동 파트너'
+      : characterLevel >= 7
+        ? '성장 중인 프로티'
+        : characterLevel >= 3
+          ? '초보 코치 프로티'
+          : '새싹 프로티';
+  const todaysStats = todaysSessions.reduce(
+    (total, session) => {
+      const stats = getSessionStats(session);
+      return {
+        exerciseCount: total.exerciseCount + stats.exerciseCount,
+        setCount: total.setCount + stats.setCount,
+        volume: total.volume + stats.volume,
+      };
+    },
+    { exerciseCount: 0, setCount: 0, volume: 0 },
+  );
+  const todaysRewardExp = Math.round(todaysStats.setCount * 34 + todaysStats.volume / 90);
+  const weeklyWorkoutDateCount = trainedDateKeys.filter((dateKey) => {
+    const date = new Date(`${dateKey}T00:00:00`);
+    const diffDays = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays >= 0 && diffDays < 7;
+  }).length;
+  const weeklyMissionProgress = Math.min(100, Math.round((weeklyWorkoutDateCount / 4) * 100));
+  const characterMilestones = [
+    {
+      label: '닭가슴살',
+      value: `${chickenBreastBalance.toLocaleString()}개`,
+      description: todaysRewardExp > 0
+        ? `오늘 보상 EXP +${todaysRewardExp}`
+        : `운동 ${earnedChickenBreasts.toLocaleString()}개, 무료 ${shopState.freeChickenBreasts.toLocaleString()}개`,
+    },
+    {
+      label: '연속 운동',
+      value: `${workoutStreak}일`,
+      description: workoutStreak > 0 ? '프로티가 루틴을 기억하고 있어요.' : '오늘 첫 기록으로 시작할 수 있어요.',
+    },
+    {
+      label: '누적 볼륨',
+      value: `${Math.round(totalWorkoutVolume).toLocaleString()}kg`,
+      description: '기록된 모든 세트의 무게와 반복 수를 합산합니다.',
+    },
+  ];
+  const equippedOutfitItem = getShopItemById(shopState.equipped.outfit);
+  const equippedAccessoryItem = getShopItemById(shopState.equipped.accessory);
+  const equippedCompanionItem = getShopItemById(shopState.equipped.companion);
+  const shopCategories: { category: ShopCategory; title: string; description: string }[] = [
+    { category: 'avatar', title: '캐릭터 잠금해제', description: '캐릭터1, 캐릭터4는 닭가슴살로 교환할 수 있어요.' },
+    { category: 'clothing', title: '운동복', description: '구매하면 옷장에 보관되고 장착 상태로 표시됩니다.' },
+    { category: 'accessory', title: '악세사리', description: '물통, 짐백처럼 캐릭터 주변 소품을 꾸밉니다.' },
+    { category: 'companion', title: '펫', description: '구매 후 장착하면 홈 화면 캐릭터 옆에 나타납니다.' },
+  ];
+  const visibleShopItems = user ? shopCatalog.filter((item) => !item.gender || item.gender === user.gender) : [];
 
   if (!authChecked) {
     return <main className="loading">로그인 상태 확인 중</main>;
@@ -1446,6 +2092,9 @@ export function App() {
     setExerciseFormOpen(false);
     setCustomExerciseOpen(false);
     setFinishConfirmOpen(false);
+    setAvatarPickerOpen(false);
+    setSelectedAvatarId(null);
+    setAvatarChecked(false);
     setSummarySessionId(null);
     setSessions([]);
     setFavoriteMachineIds(new Set());
@@ -1571,6 +2220,9 @@ export function App() {
           <button className={activeView === 'oneRm' ? 'active' : ''} type="button" onClick={() => navigateToView('oneRm')}>
             1RM
           </button>
+          <button className={activeView === 'shop' ? 'active' : ''} type="button" onClick={() => navigateToView('shop')}>
+            상점
+          </button>
           <button className={activeView === 'activity' ? 'active' : ''} type="button" onClick={() => navigateToView('activity')}>
             내 활동
           </button>
@@ -1584,56 +2236,133 @@ export function App() {
         </div>
       </header>
 
-      <section className="hero-band" id="home">
-        <div className="hero-glow" />
-        <div className="hero-content">
-          <span>{workoutStartedAt == null ? '오늘의 운동 기록' : `운동 중 ${formatSeconds(workoutElapsedSeconds)}`}</span>
-          <h1>
-            방금 한 세트까지
-            <br />
-            기구별로 남겨볼까요?
-          </h1>
-          <button type="button" onClick={() => navigateToView('record')}>
-            {workoutStartedAt == null ? '운동 시작하기' : '운동 이어가기'}
-          </button>
-        </div>
-      </section>
+      {activeView !== 'home' && (
+        <section className="hero-band" id="home">
+          <div className="hero-glow" />
+          <div className="hero-content">
+            <span>{workoutStartedAt == null ? '오늘의 운동 기록' : `운동 중 ${formatSeconds(workoutElapsedSeconds)}`}</span>
+            <h1>
+              방금 한 세트까지
+              <br />
+              기구별로 남겨볼까요?
+            </h1>
+            <button type="button" onClick={() => navigateToView('record')}>
+              {workoutStartedAt == null ? '운동 시작하기' : '운동 이어가기'}
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="content-shell">
         {activeView === 'home' && (
-          <section className="home-dashboard">
-            <div className="section-heading">
-              <div>
-                <h2>오늘의 Repick</h2>
-                <p>기록, 휴식 타이머, 이전 수행 기록을 한 흐름으로 관리합니다.</p>
-              </div>
-              <button className="link-button" type="button" onClick={() => navigateToView('record')}>
-                {workoutStartedAt == null ? '운동 시작하기' : '운동 이어가기'}
-                <ChevronRight size={16} />
-              </button>
-            </div>
-
-            <section className={workoutStartedAt == null ? 'workout-status-card' : 'workout-status-card active'}>
-              <div className="workout-status-main">
-                <span>{workoutStartedAt == null ? 'Ready' : 'Live workout'}</span>
-                <strong>{workoutStartedAt == null ? '오늘 운동을 시작해볼까요?' : formatSeconds(workoutElapsedSeconds)}</strong>
-                <p>
-                  {workoutStartedAt == null
-                    ? '운동기록 화면에서 시작을 누르면 운동 시간이 기록되고, 저장한 종목과 부위가 세션 요약에 쌓입니다.'
-                    : `${activeWorkoutRecords.length}개 운동, ${activeWorkoutSetCount}세트 진행 중`}
-                </p>
-              </div>
-              <div className="workout-status-actions">
-                {workoutStartedAt == null ? (
+          <section className="character-home">
+            <section className="character-hero-card" aria-label="내 운동 캐릭터">
+              <div className="character-copy">
+                <span>{workoutStartedAt == null ? '오늘의 운동 파트너' : `운동 중 ${formatSeconds(workoutElapsedSeconds)}`}</span>
+                <h1>내 캐릭터가 오늘 운동을 기다리고 있어요</h1>
+                <p>{characterMood}</p>
+                <div className="character-action-row">
                   <button className="primary-button" type="button" onClick={() => navigateToView('record')}>
                     <Timer size={16} />
-                    운동 시작하기
+                    {workoutStartedAt == null ? '운동 시작하기' : '운동 이어가기'}
+                  </button>
+                  <button className="secondary-button" type="button" onClick={() => navigateToView('activity')}>
+                    <CalendarDays size={16} />
+                    성장 기록
+                  </button>
+                  <button className="secondary-button" type="button" onClick={() => setAvatarPickerOpen(true)}>
+                    <UserRound size={16} />
+                    캐릭터 변경
+                  </button>
+                  <button className="secondary-button" type="button" onClick={() => navigateToView('shop')}>
+                    <Gift size={16} />
+                    상점
+                  </button>
+                </div>
+              </div>
+
+              <div className="character-stage">
+                <div className="character-room">
+                  <span className="room-detail shelf" />
+                  <span className="room-detail mat" />
+                  <span className="room-detail dumbbell-left" />
+                  <span className="room-detail dumbbell-right" />
+                  <WorkoutAvatar candidate={selectedAvatar} />
+                  {equippedCompanionItem?.category === 'companion' && equippedCompanionItem.imageUrl && (
+                    <img
+                      alt={equippedCompanionItem.name}
+                      className={`cat-companion-image ${equippedCompanionItem.visualClass}`}
+                      src={equippedCompanionItem.imageUrl}
+                    />
+                  )}
+                  {equippedAccessoryItem?.category === 'accessory' && (
+                    <span className={`equipped-accessory ${equippedAccessoryItem.visualClass}`} aria-label={equippedAccessoryItem.name} />
+                  )}
+                  {equippedOutfitItem?.category === 'clothing' && (
+                    <span className={`equipped-outfit-tag ${equippedOutfitItem.visualClass}`}>
+                      {equippedOutfitItem.name}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <section className="character-level-panel">
+              <div className="character-level-head">
+                <div>
+                  <span>LV.{characterLevel}</span>
+                  <strong>{characterTitle}</strong>
+                </div>
+                <p>{characterCurrentExp.toLocaleString()} / {characterLevelExp.toLocaleString()} EXP</p>
+              </div>
+              <div className="character-exp-track" aria-label="캐릭터 경험치">
+                <span style={{ width: `${characterExpPercent}%` }} />
+              </div>
+              <div className="character-level-foot">
+                <span>누적 {characterTotalExp.toLocaleString()} EXP</span>
+                <span>다음 레벨까지 {(characterLevelExp - characterCurrentExp).toLocaleString()} EXP</span>
+              </div>
+            </section>
+
+            <section className="character-reward-grid">
+              {characterMilestones.map((milestone) => (
+                <article key={milestone.label}>
+                  <span>{milestone.label}</span>
+                  <strong>{milestone.value}</strong>
+                  <p>{milestone.description}</p>
+                </article>
+              ))}
+            </section>
+
+            <section className={workoutStartedAt == null ? 'character-workout-card' : 'character-workout-card active'}>
+              <div>
+                <span>{workoutStartedAt == null ? '오늘의 퀘스트' : '진행 중인 퀘스트'}</span>
+                <strong>
+                  {workoutStartedAt == null
+                    ? todaysSessions.length > 0
+                      ? '오늘 보상은 이미 적립됐어요'
+                      : `${selectedAvatar.name}에게 닭가슴살을 모아주세요`
+                    : `${activeWorkoutRecords.length}개 운동, ${activeWorkoutSetCount}세트 진행 중`}
+                </strong>
+                <p>
+                  {workoutStartedAt == null
+                    ? '세트와 볼륨이 쌓일수록 경험치와 닭가슴살이 오르고, 옷장 꾸미기가 가까워집니다.'
+                    : activeWorkoutParts.length > 0
+                      ? `${activeWorkoutParts.join(' · ')} 기록이 캐릭터 성장에 반영됩니다.`
+                      : '첫 종목을 추가하면 오늘의 성장 보상이 계산됩니다.'}
+                </p>
+              </div>
+              <div className="character-workout-actions">
+                {workoutStartedAt == null ? (
+                  <button className="primary-button" type="button" onClick={() => navigateToView('record')}>
+                    <Dumbbell size={16} />
+                    기록하러 가기
                   </button>
                 ) : (
                   <>
                     <button className="secondary-button" type="button" onClick={openExercisePicker}>
                       <Plus size={16} />
-                      기록 추가
+                      세트 추가
                     </button>
                     <button className="primary-button" type="button" onClick={requestFinishWorkout}>
                       <CheckCircle2 size={16} />
@@ -1642,54 +2371,176 @@ export function App() {
                   </>
                 )}
               </div>
-              <div className="workout-chip-row">
-                {(workoutStartedAt == null ? todaysParts : activeWorkoutParts).length === 0 && (
-                  <span>아직 기록된 부위가 없습니다</span>
-                )}
-                {(workoutStartedAt == null ? todaysParts : activeWorkoutParts).map((part) => (
-                  <span key={part}>{part}</span>
-                ))}
-              </div>
             </section>
 
-            <div className="home-metrics">
-              <article>
-                <Dumbbell size={22} />
-                <strong>{todaysExerciseNames.length}</strong>
-                <span>오늘 운동 종목</span>
+            <section className="character-mission-layout">
+              <article className="weekly-mission-card">
+                <div className="mission-card-head">
+                  <span><Flame size={16} /> 주간 미션</span>
+                  <strong>{weeklyWorkoutDateCount}/4일</strong>
+                </div>
+                <div className="mission-progress-track">
+                  <span style={{ width: `${weeklyMissionProgress}%` }} />
+                </div>
+                <p>이번 주 4일 운동하면 아바타 상점에서 쓸 보너스 닭가슴살을 받을 수 있어요.</p>
               </article>
-              <article>
-                <CalendarDays size={22} />
-                <strong>{trainedDateSet.size}</strong>
-                <span>운동한 날짜</span>
+
+              <article className="character-menu-card">
+                <button type="button" onClick={() => navigateToView('oneRm')}>
+                  <Calculator size={18} />
+                  <span>1RM 계산</span>
+                  <ChevronRight size={16} />
+                </button>
+                <button type="button" onClick={() => navigateToView('activity')}>
+                  <Award size={18} />
+                  <span>캘린더 보기</span>
+                  <ChevronRight size={16} />
+                </button>
+                {routinePlannerEnabled && (
+                  <button type="button" onClick={() => navigateToView('planner')}>
+                    <Sparkles size={18} />
+                    <span>루틴 설계</span>
+                    <ChevronRight size={16} />
+                  </button>
+                )}
+                <button type="button" onClick={openExercisePicker}>
+                  <Gift size={18} />
+                  <span>빠른 기록</span>
+                  <ChevronRight size={16} />
+                </button>
+                <button type="button" onClick={() => setAvatarPickerOpen(true)}>
+                  <UserRound size={18} />
+                  <span>캐릭터 변경</span>
+                  <ChevronRight size={16} />
+                </button>
+                <button type="button" onClick={() => navigateToView('shop')}>
+                  <Gift size={18} />
+                  <span>상점</span>
+                  <ChevronRight size={16} />
+                </button>
               </article>
-              <article>
-                <CheckCircle2 size={22} />
-                <strong>{totalSavedSets}</strong>
-                <span>누적 세트</span>
-              </article>
+            </section>
+          </section>
+        )}
+
+        {activeView === 'shop' && (
+          <section className="shop-page">
+            <div className="section-heading">
+              <div>
+                <h2>상점</h2>
+                <p>운동으로 모은 닭가슴살로 캐릭터, 옷, 악세사리, 고양이를 해금하세요.</p>
+              </div>
+              <button className="link-button" type="button" onClick={() => navigateToView('home')}>
+                내 캐릭터 보기
+                <ChevronRight size={16} />
+              </button>
             </div>
 
-            <div className="home-actions-grid">
-              <button type="button" onClick={openExercisePicker}>
-                <strong>새 운동 기록</strong>
-                <span>기구를 고르고 세트별 무게/횟수를 입력합니다.</span>
-              </button>
-              {routinePlannerEnabled && (
-                <button type="button" onClick={() => navigateToView('planner')}>
-                  <strong>AI 루틴 설계</strong>
-                  <span>프로필과 분할 방식을 고르면 주간 플랜 초안을 만듭니다.</span>
+            <section className="shop-summary-grid">
+              <article className="shop-balance-card">
+                <span>보유 닭가슴살</span>
+                <strong>{chickenBreastBalance.toLocaleString()}개</strong>
+                <p>
+                  운동 {earnedChickenBreasts.toLocaleString()}개 · 지급 {grantedChickenBreasts.toLocaleString()}개 · 무료 {shopState.freeChickenBreasts.toLocaleString()}개 · 사용 {shopState.spentChickenBreasts.toLocaleString()}개
+                </p>
+                <button className="free-chicken-button" type="button" onClick={receiveFreeChickenBreasts}>
+                  무료 닭가슴살 받기
+                  <strong>+1,000</strong>
                 </button>
-              )}
-              <button type="button" onClick={() => navigateToView('oneRm')}>
-                <strong>1RM 계산기</strong>
-                <span>주요 리프트의 예상 최대 중량을 빠르게 계산합니다.</span>
-              </button>
-              <button type="button" onClick={() => navigateToView('activity')}>
-                <strong>내 활동 보기</strong>
-                <span>캘린더와 날짜별 세션 상세를 확인합니다.</span>
-              </button>
-            </div>
+              </article>
+              <article className="shop-preview-card">
+                <div className="shop-preview-copy">
+                  <span>현재 장착</span>
+                  <strong>{selectedAvatar.name}</strong>
+                  <p>
+                    {[equippedOutfitItem?.name, equippedAccessoryItem?.name, equippedCompanionItem?.name]
+                      .filter(Boolean)
+                      .join(' · ') || '장착한 아이템 없음'}
+                  </p>
+                </div>
+                <div className="shop-preview-room">
+                  <WorkoutAvatar candidate={selectedAvatar} compact />
+                  {equippedCompanionItem?.category === 'companion' && equippedCompanionItem.imageUrl && (
+                    <img
+                      alt=""
+                      className={`cat-companion-image shop ${equippedCompanionItem.visualClass}`}
+                      src={equippedCompanionItem.imageUrl}
+                    />
+                  )}
+                  {equippedAccessoryItem?.category === 'accessory' && (
+                    <span className={`equipped-accessory shop ${equippedAccessoryItem.visualClass}`} aria-hidden="true" />
+                  )}
+                </div>
+              </article>
+            </section>
+
+            {shopCategories.map((shopCategory) => {
+              const categoryItems = visibleShopItems.filter((item) => item.category === shopCategory.category);
+
+              return (
+                <section className="shop-category-section" key={shopCategory.category}>
+                  <div className="shop-category-head">
+                    <div>
+                      <span>{getShopCategoryLabel(shopCategory.category)}</span>
+                      <h3>{shopCategory.title}</h3>
+                    </div>
+                    <p>{shopCategory.description}</p>
+                  </div>
+                  <div className="shop-item-grid">
+                    {categoryItems.map((item) => {
+                      const purchased = purchasedShopItemIds.has(item.id);
+                      const equipped = Boolean(item.slot && shopState.equipped[item.slot] === item.id);
+                      const insufficient = !purchased && item.price > chickenBreastBalance;
+                      const avatarUnlocked = item.avatarId
+                        ? isAvatarCandidateUnlocked(
+                          avatarCandidates.find((candidate) => candidate.id === item.avatarId) ?? selectedAvatar,
+                          purchasedShopItemIds,
+                        )
+                        : false;
+
+                      return (
+                        <article className={purchased || avatarUnlocked ? 'shop-item-card owned' : 'shop-item-card'} key={item.id}>
+                          <ShopItemVisual item={item} />
+                          <div className="shop-item-copy">
+                            <span>{item.tag}</span>
+                            <strong>{item.name}</strong>
+                            <p>{item.description}</p>
+                          </div>
+                          <div className="shop-item-foot">
+                            <span>{item.price.toLocaleString()}개</span>
+                            {purchased || avatarUnlocked ? (
+                              item.slot ? (
+                                <button
+                                  className={equipped ? 'shop-item-button equipped' : 'shop-item-button'}
+                                  disabled={equipped}
+                                  type="button"
+                                  onClick={() => equipShopItem(item)}
+                                >
+                                  {equipped ? '장착 중' : '장착'}
+                                </button>
+                              ) : (
+                                <button className="shop-item-button equipped" disabled type="button">
+                                  해금 완료
+                                </button>
+                              )
+                            ) : (
+                              <button
+                                className="shop-item-button"
+                                disabled={insufficient}
+                                type="button"
+                                onClick={() => buyShopItem(item)}
+                              >
+                                {insufficient ? '부족' : '구매'}
+                              </button>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
           </section>
         )}
 
@@ -2658,6 +3509,56 @@ export function App() {
           </section>
 
         </section>
+        )}
+
+        {avatarSelectionOpen && (
+          <div className="avatar-select-backdrop" role="presentation">
+            <section className="avatar-select-dialog" role="dialog" aria-modal="true" aria-label="캐릭터 선택">
+              {!avatarSelectionRequired && (
+                <button className="avatar-select-close" type="button" onClick={() => setAvatarPickerOpen(false)}>
+                  닫기
+                </button>
+              )}
+              <div className="avatar-select-head">
+                <span>{avatarSelectionRequired ? '첫 캐릭터 선택' : '캐릭터 변경'}</span>
+                <h2>{user?.gender === 'MALE' ? '남자' : '여자'} 기본 캐릭터를 골라주세요</h2>
+                <p>
+                  {avatarSelectionRequired
+                    ? '한 번 선택한 캐릭터가 홈 화면과 운동 보상 화면의 기본 아바타로 계속 표시됩니다.'
+                    : '선택한 캐릭터는 홈 화면에 바로 반영됩니다.'}
+                </p>
+              </div>
+              <div className="avatar-select-grid">
+                {userAvatarCandidates.map((candidate) => {
+                  const unlocked = isAvatarCandidateUnlocked(candidate, purchasedShopItemIds);
+
+                  return (
+                    <button
+                      className={[
+                        'avatar-select-card',
+                        candidate.id === selectedAvatarId ? 'selected' : '',
+                        !unlocked ? 'locked' : '',
+                      ].filter(Boolean).join(' ')}
+                      disabled={!unlocked}
+                      key={candidate.id}
+                      type="button"
+                      onClick={() => chooseAvatar(candidate.id)}
+                    >
+                      <div className={`avatar-select-preview ${candidate.variant}`}>
+                        <WorkoutAvatar candidate={candidate} compact />
+                        {!unlocked && (
+                          <span className="avatar-lock-badge">{candidate.unlockLabel ?? '상점 해금'}</span>
+                        )}
+                      </div>
+                      <strong>{candidate.name}</strong>
+                      <span>{candidate.title}</span>
+                      <p>{candidate.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          </div>
         )}
       </section>
     </main>
