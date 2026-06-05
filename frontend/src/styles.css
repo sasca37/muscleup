@@ -1154,6 +1154,8 @@ button {
 }
 
 .avatar-image-frame img {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   height: 100%;
@@ -1642,6 +1644,29 @@ button {
   font-size: 24px;
 }
 
+.unequip-item-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.unequip-item-button {
+  width: fit-content;
+  min-height: 34px;
+  border: 1px solid #d9e0ea;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #536274;
+  padding: 0 11px;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.unequip-item-button:hover {
+  border-color: #0a66d8;
+  color: #0a66d8;
+}
+
 .shop-preview-room {
   position: relative;
   display: grid;
@@ -1701,6 +1726,11 @@ button {
   background:
     linear-gradient(135deg, rgba(10, 102, 216, 0.1), transparent 58%),
     #ffffff;
+}
+
+.shop-item-card.selected {
+  border-color: #0a66d8;
+  box-shadow: 0 14px 28px rgba(10, 102, 216, 0.16);
 }
 
 .shop-item-visual {

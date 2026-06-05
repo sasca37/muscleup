@@ -285,6 +285,8 @@ const defaultShopState: ShopState = {
   freeChickenBreasts: 0,
   equipped: {},
 };
+const enabledShopCategories = new Set<ShopCategory>(['avatar', 'companion']);
+
 const shopCatalog: ShopItem[] = [
   {
     id: 'avatar-male-character-1',
@@ -532,6 +534,21 @@ function isAvatarCandidateUnlocked(candidate: AvatarCandidate, purchasedItemIds:
 
 function getShopItemById(itemId?: string | null) {
   return itemId ? shopCatalog.find((item) => item.id === itemId) ?? null : null;
+}
+
+const outfitImageSupportedAvatarIds = new Set([
+  'male-character-2',
+  'male-character-3',
+  'female-character-2',
+  'female-character-3',
+]);
+
+function getAvatarImageUrl(candidate: AvatarCandidate, outfit?: ShopItem | null) {
+  if (outfit?.category === 'clothing' && outfitImageSupportedAvatarIds.has(candidate.id)) {
+    return `/avatars/outfits/${candidate.id}__${outfit.id}.png`;
+  }
+
+  return candidate.imageUrl;
 }
 
 function getShopCategoryLabel(category: ShopCategory) {
@@ -895,10 +912,13 @@ function getWorkoutStreak(dateKeys: string[], todayDateKey: string) {
 function WorkoutAvatar({
   candidate,
   compact = false,
+  outfit = null,
 }: {
   candidate: AvatarCandidate;
   compact?: boolean;
+  outfit?: ShopItem | null;
 }) {
+  const avatarImageUrl = getAvatarImageUrl(candidate, outfit);
   const avatarStyle = {
     '--avatar-hair': candidate.hairColor,
     '--avatar-outfit': candidate.outfitColor,
@@ -916,7 +936,7 @@ function WorkoutAvatar({
       ].filter(Boolean).join(' ')}
       style={avatarStyle}
     >
-      <img alt={`${candidate.name} 아바타`} src={candidate.imageUrl} />
+      <img alt={`${candidate.name} 아바타`} src={avatarImageUrl} />
     </figure>
   );
 }
@@ -1084,6 +1104,20 @@ export function App() {
         ...shopState.equipped,
         [item.slot]: item.id,
       },
+    });
+  }
+
+  function unequipShopSlot(slot: ShopSlot) {
+    if (!user || !shopState.equipped[slot]) {
+      return;
+    }
+
+    const nextEquipped = { ...shopState.equipped };
+    delete nextEquipped[slot];
+
+    persistShopState({
+      ...shopState,
+      equipped: nextEquipped,
     });
   }
 
@@ -1513,16 +1547,16 @@ export function App() {
       description: '기록된 모든 세트의 무게와 반복 수를 합산합니다.',
     },
   ];
-  const equippedOutfitItem = getShopItemById(shopState.equipped.outfit);
-  const equippedAccessoryItem = getShopItemById(shopState.equipped.accessory);
+  const equippedOutfitItem = enabledShopCategories.has('clothing') ? getShopItemById(shopState.equipped.outfit) : null;
+  const equippedAccessoryItem = enabledShopCategories.has('accessory') ? getShopItemById(shopState.equipped.accessory) : null;
   const equippedCompanionItem = getShopItemById(shopState.equipped.companion);
   const shopCategories: { category: ShopCategory; title: string; description: string }[] = [
-    { category: 'avatar', title: '캐릭터 잠금해제', description: '캐릭터1, 캐릭터4는 닭가슴살로 교환할 수 있어요.' },
-    { category: 'clothing', title: '운동복', description: '구매하면 옷장에 보관되고 장착 상태로 표시됩니다.' },
-    { category: 'accessory', title: '악세사리', description: '물통, 짐백처럼 캐릭터 주변 소품을 꾸밉니다.' },
+    { category: 'avatar', title: '캐릭터', description: '기본 캐릭터를 다시 고르거나 닭가슴살로 새 캐릭터를 해금하세요.' },
     { category: 'companion', title: '펫', description: '구매 후 장착하면 홈 화면 캐릭터 옆에 나타납니다.' },
   ];
-  const visibleShopItems = user ? shopCatalog.filter((item) => !item.gender || item.gender === user.gender) : [];
+  const visibleShopItems = user
+    ? shopCatalog.filter((item) => enabledShopCategories.has(item.category) && (!item.gender || item.gender === user.gender))
+    : [];
 
   if (!authChecked) {
     return <main className="loading">로그인 상태 확인 중</main>;
@@ -2287,7 +2321,7 @@ export function App() {
                   <span className="room-detail mat" />
                   <span className="room-detail dumbbell-left" />
                   <span className="room-detail dumbbell-right" />
-                  <WorkoutAvatar candidate={selectedAvatar} />
+                  <WorkoutAvatar candidate={selectedAvatar} outfit={equippedOutfitItem} />
                   {equippedCompanionItem?.category === 'companion' && equippedCompanionItem.imageUrl && (
                     <img
                       alt={equippedCompanionItem.name}
@@ -2428,7 +2462,7 @@ export function App() {
             <div className="section-heading">
               <div>
                 <h2>상점</h2>
-                <p>운동으로 모은 닭가슴살로 캐릭터, 옷, 악세사리, 고양이를 해금하세요.</p>
+                <p>운동으로 모은 닭가슴살로 캐릭터와 고양이를 해금하세요.</p>
               </div>
               <button className="link-button" type="button" onClick={() => navigateToView('home')}>
                 내 캐릭터 보기
@@ -2457,9 +2491,28 @@ export function App() {
                       .filter(Boolean)
                       .join(' · ') || '장착한 아이템 없음'}
                   </p>
+                  {(equippedOutfitItem || equippedAccessoryItem || equippedCompanionItem) && (
+                    <div className="unequip-item-row">
+                      {equippedOutfitItem?.category === 'clothing' && (
+                        <button className="unequip-item-button" type="button" onClick={() => unequipShopSlot('outfit')}>
+                          옷 빼기
+                        </button>
+                      )}
+                      {equippedAccessoryItem?.category === 'accessory' && (
+                        <button className="unequip-item-button" type="button" onClick={() => unequipShopSlot('accessory')}>
+                          악세사리 빼기
+                        </button>
+                      )}
+                      {equippedCompanionItem?.category === 'companion' && (
+                        <button className="unequip-item-button" type="button" onClick={() => unequipShopSlot('companion')}>
+                          펫 빼기
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="shop-preview-room">
-                  <WorkoutAvatar candidate={selectedAvatar} compact />
+                  <WorkoutAvatar candidate={selectedAvatar} compact outfit={equippedOutfitItem} />
                   {equippedCompanionItem?.category === 'companion' && equippedCompanionItem.imageUrl && (
                     <img
                       alt=""
@@ -2476,6 +2529,77 @@ export function App() {
 
             {shopCategories.map((shopCategory) => {
               const categoryItems = visibleShopItems.filter((item) => item.category === shopCategory.category);
+
+              if (shopCategory.category === 'avatar') {
+                return (
+                  <section className="shop-category-section" key={shopCategory.category}>
+                    <div className="shop-category-head">
+                      <div>
+                        <span>{getShopCategoryLabel(shopCategory.category)}</span>
+                        <h3>{shopCategory.title}</h3>
+                      </div>
+                      <p>{shopCategory.description}</p>
+                    </div>
+                    <div className="shop-item-grid">
+                      {userAvatarCandidates.map((candidate) => {
+                        const unlocked = isAvatarCandidateUnlocked(candidate, purchasedShopItemIds);
+                        const selected = candidate.id === selectedAvatar.id;
+                        const unlockItem = getShopItemById(getAvatarUnlockItemId(candidate.id));
+                        const price = unlockItem?.price ?? 0;
+                        const insufficient = !unlocked && price > chickenBreastBalance;
+
+                        return (
+                          <article
+                            className={[
+                              unlocked ? 'shop-item-card owned' : 'shop-item-card',
+                              selected ? 'selected' : '',
+                            ].filter(Boolean).join(' ')}
+                            key={candidate.id}
+                          >
+                            <div className="shop-item-visual avatar-preview">
+                              <WorkoutAvatar candidate={candidate} compact />
+                              {!unlocked && (
+                                <span className="avatar-lock-badge">{candidate.unlockLabel ?? '상점 해금'}</span>
+                              )}
+                            </div>
+                            <div className="shop-item-copy">
+                              <span>{candidate.unlockType === 'default' ? '기본 캐릭터' : '교환 캐릭터'}</span>
+                              <strong>{candidate.name}</strong>
+                              <p>{candidate.description}</p>
+                            </div>
+                            <div className="shop-item-foot">
+                              <span>{unlocked ? '보유중' : `${price.toLocaleString()}개`}</span>
+                              {unlocked ? (
+                                <button
+                                  className={selected ? 'shop-item-button equipped' : 'shop-item-button'}
+                                  disabled={selected}
+                                  type="button"
+                                  onClick={() => chooseAvatar(candidate.id)}
+                                >
+                                  {selected ? '선택됨' : '변경'}
+                                </button>
+                              ) : (
+                                <button
+                                  className="shop-item-button"
+                                  disabled={!unlockItem || insufficient}
+                                  type="button"
+                                  onClick={() => {
+                                    if (unlockItem) {
+                                      buyShopItem(unlockItem);
+                                    }
+                                  }}
+                                >
+                                  {insufficient ? '부족' : '구매'}
+                                </button>
+                              )}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              }
 
               return (
                 <section className="shop-category-section" key={shopCategory.category}>
@@ -2512,11 +2636,17 @@ export function App() {
                               item.slot ? (
                                 <button
                                   className={equipped ? 'shop-item-button equipped' : 'shop-item-button'}
-                                  disabled={equipped}
                                   type="button"
-                                  onClick={() => equipShopItem(item)}
+                                  onClick={() => {
+                                    if (equipped && item.slot) {
+                                      unequipShopSlot(item.slot);
+                                      return;
+                                    }
+
+                                    equipShopItem(item);
+                                  }}
                                 >
-                                  {equipped ? '장착 중' : '장착'}
+                                  {equipped ? '해제' : '장착'}
                                 </button>
                               ) : (
                                 <button className="shop-item-button equipped" disabled type="button">
